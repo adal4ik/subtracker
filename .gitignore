@@ -1,0 +1,25 @@
+# Go
+/bin/
+/build/
+/dist/
+*.exe
+*.test
+*.out
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+
+# Logs
+*.log
+
+# Env files
+.env
+
+
+
+# Binaries
+subtracker
+
