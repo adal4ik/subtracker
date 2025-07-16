@@ -50,3 +50,23 @@ migrate-goto:
 
 migrate-version:
 	migrate -path ./migrations -database "$$(grep POSTGRES_DSN .env | cut -d '=' -f2-)" version
+
+
+help:
+	@echo "Available commands:"
+	@echo "  build          - Build the Go application"
+	@echo "  run            - Run the Go application"
+	@echo "  tidy           - Tidy up Go modules"
+	@echo "  test           - Run tests"
+	@echo "  up             - Start Docker containers"
+	@echo "  down           - Stop Docker containers"
+	@echo "  restart        - Restart Docker containers"
+	@echo "  logs           - Show Docker logs"
+	@echo "  ps             - List Docker containers"
+	@echo "  migrate-up     - Apply database migrations"
+	@echo "  migrate-down   - Rollback database migrations"
+	@echo "  migrate-force  - Force a migration version"
+	@echo "  migrate-drop   - Drop the database schema"
+	@echo "  migrate-goto   - Go to a specific migration version"
+	@echo "  migrate-version- Show current migration version"
+	@echo "  help           - Show this help message"

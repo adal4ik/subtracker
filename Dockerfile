@@ -9,6 +9,6 @@ RUN go mod download
 
 COPY . .
 
-RUN go build -o subtracker ./cmd
+RUN go build -o subtracker ./cmd/app
 
 CMD ["./subtracker"]
