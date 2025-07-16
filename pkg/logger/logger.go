@@ -21,19 +21,21 @@ type zapLogger struct {
 	logger *zap.Logger
 }
 
-func New(prod string) Logger {
-	var logger *zap.Logger
-	var err error
+func New(env string) Logger {
+	var cfg zap.Config
 
-	switch prod {
+	switch env {
 	case EnvProd:
-		logger, err = zap.NewProduction(zap.AddCaller(), zap.AddCallerSkip(1))
+		cfg = zap.NewProductionConfig()
 	case EnvDev:
-		logger, err = zap.NewDevelopment(zap.AddCaller(), zap.AddCallerSkip(1))
+		cfg = zap.NewDevelopmentConfig()
 	default:
-		logger, err = zap.NewDevelopment(zap.AddCaller(), zap.AddCallerSkip(1)) // Default to development if not specified
+		cfg = zap.NewDevelopmentConfig()
 	}
 
+	cfg.DisableStacktrace = true
+
+	logger, err := cfg.Build(zap.AddCaller(), zap.AddCallerSkip(1)) // Добавляем 1 строку вызова
 	if err != nil {
 		panic("cannot initialize zap logger: " + err.Error())
 	}
