@@ -1,11 +1,16 @@
 package handler
 
+import (
+	"subtracker/internal/service"
+	"subtracker/pkg/logger"
+)
+
 type Handlers struct {
-	// Add fields and methods for your handler here
+	SubscriptionHandler *SubscriptionHandler
 }
 
-func NewHandlers() *Handlers {
+func NewHandlers(service *service.Service, logger logger.Logger) *Handlers {
 	return &Handlers{
-		// Initialize your handler fields here
+		SubscriptionHandler: NewSubscriptionHandler(service.SubscriptionService, logger),
 	}
 }
