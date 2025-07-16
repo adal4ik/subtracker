@@ -6,11 +6,11 @@ import (
 )
 
 type Repository struct {
-	SubscriptionRepository SubscriptionRepository
+	SubscriptionRepository *SubscriptionRepository
 }
 
 func NewRepository(db *sql.DB, logger logger.Logger) *Repository {
 	return &Repository{
-		*NewSubscriptionRepository(db, logger),
+		NewSubscriptionRepository(db, logger),
 	}
 }
