@@ -1,5 +1,7 @@
 package dto
 
+import "time"
+
 type CreateSubscriptionRequest struct {
 	ServiceName string `json:"service_name"`
 	Price       int    `json:"price"`
@@ -25,13 +27,24 @@ type SubscriptionResponse struct {
 }
 
 type SubscriptionFilter struct {
-	UserID      string  `json:"user_id"`
-	ServiceName string  `json:"service_name"`
-	MinPrice    float64 `json:"min_price"`
-	MaxPrice    float64 `json:"max_price"`
-	StartDate   string  `json:"start_date"`
-	EndDate     string  `json:"end_date"`
-	HasEndDate  *bool   `json:"has_end_date"`
-	Limit       int     `json:"limit"`
-	Offset      int     `json:"offset"`
+	UserID      string `json:"user_id"`
+	ServiceName string `json:"service_name"`
+	MinPrice    int    `json:"min_price"`
+	MaxPrice    int    `json:"max_price"`
+	StartDate   string `json:"start_date"`
+	EndDate     string `json:"end_date"`
+	HasEndDate  *bool  `json:"has_end_date"`
+	Limit       int    `json:"limit"`
+	Offset      int    `json:"offset"`
+}
+
+type CostFilter struct {
+	UserID      string
+	ServiceName string
+	PeriodStart time.Time
+	PeriodEnd   time.Time
+}
+
+type CostResponse struct {
+	TotalCost int `json:"total_cost"`
 }

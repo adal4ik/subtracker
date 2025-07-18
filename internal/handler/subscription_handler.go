@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"strconv"
 	"subtracker/internal/domain/dto"
 	"subtracker/internal/mapper"
 	"subtracker/internal/service"
@@ -11,6 +12,7 @@ import (
 	"subtracker/pkg/logger"
 	"subtracker/pkg/response"
 	"subtracker/utils"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -54,6 +56,72 @@ func (s *SubscriptionHandler) handleError(w http.ResponseWriter, r *http.Request
 	jsonErr.Send(w)
 }
 
+func (s *SubscriptionHandler) validateListFilter(r *http.Request) error {
+	query := r.URL.Query()
+
+	if userIDStr := query.Get("user_id"); userIDStr != "" {
+		if _, err := uuid.Parse(userIDStr); err != nil {
+			return apperrors.NewBadRequest("invalid user_id format", err)
+		}
+	}
+
+	if startDateStr := query.Get("start_date"); startDateStr != "" {
+		if _, err := time.Parse("01-2006", startDateStr); err != nil {
+			return apperrors.NewBadRequest("invalid start_date format, use MM-YYYY", err)
+		}
+	}
+
+	if endDateStr := query.Get("end_date"); endDateStr != "" {
+		if _, err := time.Parse("01-2006", endDateStr); err != nil {
+			return apperrors.NewBadRequest("invalid end_date format, use MM-YYYY", err)
+		}
+	}
+
+	if limitStr := query.Get("limit"); limitStr != "" {
+		limit, err := strconv.Atoi(limitStr)
+		if err != nil || limit < 0 {
+			return apperrors.NewBadRequest("limit must be a non-negative integer", err)
+		}
+		const maxLimit = 100
+		if limit > maxLimit {
+			return apperrors.NewBadRequest("limit exceeds maximum allowed value of 100", nil)
+		}
+	}
+
+	if offsetStr := query.Get("offset"); offsetStr != "" {
+		if offset, err := strconv.Atoi(offsetStr); err != nil || offset < 0 {
+			return apperrors.NewBadRequest("offset must be a non-negative integer", err)
+		}
+	}
+
+	var minPrice, maxPrice int
+	var err error
+
+	minPriceStr := query.Get("min_price")
+	if minPriceStr != "" {
+		minPrice, err = strconv.Atoi(minPriceStr)
+		if err != nil || minPrice < 0 {
+			return apperrors.NewBadRequest("min_price must be a non-negative integer", err)
+		}
+	}
+
+	maxPriceStr := query.Get("max_price")
+	if maxPriceStr != "" {
+		maxPrice, err = strconv.Atoi(maxPriceStr)
+		if err != nil || maxPrice < 0 {
+			return apperrors.NewBadRequest("max_price must be a non-negative integer", err)
+		}
+	}
+
+	if minPriceStr != "" && maxPriceStr != "" {
+		if minPrice > maxPrice {
+			return apperrors.NewBadRequest("min_price cannot be greater than max_price", nil)
+		}
+	}
+
+	return nil
+}
+
 func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 	var req dto.CreateSubscriptionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -84,14 +152,19 @@ func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.
 }
 
 func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
+	if err := s.validateListFilter(r); err != nil {
+		s.handleError(w, r, err)
+		return
+	}
+
 	query := r.URL.Query()
 	filter := dto.SubscriptionFilter{
 		UserID:      query.Get("user_id"),
 		ServiceName: query.Get("service_name"),
 		StartDate:   query.Get("start_date"),
 		EndDate:     query.Get("end_date"),
-		MinPrice:    utils.ParseFloatOrDefault(query.Get("min_price"), 0),
-		MaxPrice:    utils.ParseFloatOrDefault(query.Get("max_price"), 0),
+		MinPrice:    utils.ParseIntOrDefault(query.Get("min_price"), 0),
+		MaxPrice:    utils.ParseIntOrDefault(query.Get("max_price"), 0),
 		HasEndDate:  utils.ParseBoolPointer(query.Get("has_end_date")),
 		Limit:       utils.ParseIntOrDefault(query.Get("limit"), 10),
 		Offset:      utils.ParseIntOrDefault(query.Get("offset"), 0),
@@ -177,4 +250,50 @@ func (s *SubscriptionHandler) DeleteSubscription(w http.ResponseWriter, r *http.
 	}
 
 	response.APIResponse{Code: http.StatusOK, Message: "Subscription deleted successfully"}.Send(w)
+}
+
+func (s *SubscriptionHandler) CalculateCost(w http.ResponseWriter, r *http.Request) {
+	query := r.URL.Query()
+
+	// 1. Парсим и валидируем обязательные параметры
+	userID := query.Get("user_id")
+	if _, err := uuid.Parse(userID); err != nil {
+		s.handleError(w, r, apperrors.NewBadRequest("invalid or missing user_id", err))
+		return
+	}
+
+	periodStartStr := query.Get("period_start")
+	periodStart, err := time.Parse("01-2006", periodStartStr)
+	if err != nil {
+		s.handleError(w, r, apperrors.NewBadRequest("invalid or missing period_start, use MM-YYYY format", err))
+		return
+	}
+
+	periodEndStr := query.Get("period_end")
+	periodEnd, err := time.Parse("01-2006", periodEndStr)
+	if err != nil {
+		s.handleError(w, r, apperrors.NewBadRequest("invalid or missing period_end, use MM-YYYY format", err))
+		return
+	}
+
+	// 2. Создаем фильтр
+	filter := dto.CostFilter{
+		UserID:      userID,
+		ServiceName: query.Get("service_name"), // Опциональный параметр
+		PeriodStart: periodStart,
+		PeriodEnd:   periodEnd,
+	}
+
+	// 3. Вызываем сервис
+	totalCost, err := s.service.CalculateCost(r.Context(), filter)
+	if err != nil {
+		s.handleError(w, r, err)
+		return
+	}
+
+	// 4. Формируем успешный ответ
+	responseDTO := dto.CostResponse{TotalCost: totalCost}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(responseDTO)
 }

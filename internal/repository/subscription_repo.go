@@ -21,6 +21,7 @@ type SubscriptionRepositoryInterface interface {
 	GetSubscription(ctx context.Context, id string) (dao.SubscriptionRow, error)
 	UpdateSubscription(ctx context.Context, subDao dao.SubscriptionRow) error
 	DeleteSubscription(ctx context.Context, id string) error
+	ListForCostCalculation(ctx context.Context, filter dto.CostFilter) ([]dao.SubscriptionRow, error)
 }
 
 type SubscriptionRepository struct {
@@ -179,4 +180,41 @@ func (r *SubscriptionRepository) DeleteSubscription(ctx context.Context, id stri
 	}
 
 	return nil
+}
+
+func (r *SubscriptionRepository) ListForCostCalculation(ctx context.Context, filter dto.CostFilter) ([]dao.SubscriptionRow, error) {
+	// Базовый запрос
+	query := `SELECT id, user_id, service_name, price, start_date, end_date 
+			FROM subscriptions 
+			WHERE user_id = $1`
+	args := []interface{}{filter.UserID}
+	argIdx := 2
+
+	// Добавляем фильтр по имени сервиса, если он есть
+	if filter.ServiceName != "" {
+		query += fmt.Sprintf(" AND service_name = $%d", argIdx)
+		args = append(args, filter.ServiceName)
+		argIdx++
+	}
+
+	query += fmt.Sprintf(` AND (start_date <= $%d AND (end_date IS NULL OR end_date >= $%d))`, argIdx, argIdx+1)
+	args = append(args, filter.PeriodEnd, filter.PeriodStart)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		r.logger.Error("Failed to list subscriptions for cost calculation", zap.Error(err))
+		return nil, apperrors.NewInternalServerError("database error on cost calculation", err)
+	}
+	defer rows.Close()
+
+	var result []dao.SubscriptionRow
+	for rows.Next() {
+		var sub dao.SubscriptionRow
+		if err := rows.Scan(&sub.ID, &sub.UserID, &sub.ServiceName, &sub.Price, &sub.StartDate, &sub.EndDate); err != nil {
+			r.logger.Error("Failed to scan subscription row for cost", zap.Error(err))
+			return nil, apperrors.NewInternalServerError("database error on scan for cost", err)
+		}
+		result = append(result, sub)
+	}
+	return result, nil
 }
