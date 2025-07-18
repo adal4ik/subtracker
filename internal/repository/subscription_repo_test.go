@@ -225,3 +225,29 @@ func TestDeleteSubscription(t *testing.T) {
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }
+
+func TestListForCostCalculation(t *testing.T) {
+	repo, mock := newTestRepo(t)
+	userID := uuid.New()
+
+	filter := dto.CostFilter{
+		UserID:      userID.String(),
+		ServiceName: "Netflix",
+		PeriodStart: time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC),
+		PeriodEnd:   time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC),
+	}
+
+	rows := sqlmock.NewRows([]string{"id", "user_id", "service_name", "price", "start_date", "end_date"}).
+		AddRow(uuid.New(), userID, "Netflix", 100, time.Now(), nil)
+
+	expectedQuery := `^SELECT .* FROM subscriptions WHERE user_id = .* AND service_name = .* AND \(start_date <= .*`
+	mock.ExpectQuery(expectedQuery).
+		WithArgs(filter.UserID, filter.ServiceName, filter.PeriodEnd, filter.PeriodStart).
+		WillReturnRows(rows)
+
+	result, err := repo.ListForCostCalculation(context.Background(), filter)
+
+	assert.NoError(t, err)
+	assert.Len(t, result, 1)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}

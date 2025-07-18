@@ -79,6 +79,36 @@ func (_m *SubscriptionRepositoryInterface) GetSubscription(ctx context.Context, 
 	return r0, r1
 }
 
+// ListForCostCalculation provides a mock function with given fields: ctx, filter
+func (_m *SubscriptionRepositoryInterface) ListForCostCalculation(ctx context.Context, filter dto.CostFilter) ([]dao.SubscriptionRow, error) {
+	ret := _m.Called(ctx, filter)
+
+	if len(ret) == 0 {
+		panic("no return value specified for ListForCostCalculation")
+	}
+
+	var r0 []dao.SubscriptionRow
+	var r1 error
+	if rf, ok := ret.Get(0).(func(context.Context, dto.CostFilter) ([]dao.SubscriptionRow, error)); ok {
+		return rf(ctx, filter)
+	}
+	if rf, ok := ret.Get(0).(func(context.Context, dto.CostFilter) []dao.SubscriptionRow); ok {
+		r0 = rf(ctx, filter)
+	} else {
+		if ret.Get(0) != nil {
+			r0 = ret.Get(0).([]dao.SubscriptionRow)
+		}
+	}
+
+	if rf, ok := ret.Get(1).(func(context.Context, dto.CostFilter) error); ok {
+		r1 = rf(ctx, filter)
+	} else {
+		r1 = ret.Error(1)
+	}
+
+	return r0, r1
+}
+
 // ListSubscriptions provides a mock function with given fields: ctx, subFilter
 func (_m *SubscriptionRepositoryInterface) ListSubscriptions(ctx context.Context, subFilter dto.SubscriptionFilter) ([]dao.SubscriptionRow, error) {
 	ret := _m.Called(ctx, subFilter)
