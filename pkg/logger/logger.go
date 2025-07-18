@@ -14,6 +14,7 @@ type Logger interface {
 	Info(msg string, fields ...zap.Field)
 	Error(msg string, fields ...zap.Field)
 	Fatal(msg string, fields ...zap.Field)
+	Warn(msg string, fields ...zap.Field)
 	Sync() error
 }
 
@@ -35,7 +36,7 @@ func New(env string) Logger {
 
 	cfg.DisableStacktrace = true
 
-	logger, err := cfg.Build(zap.AddCaller(), zap.AddCallerSkip(1)) // Добавляем 1 строку вызова
+	logger, err := cfg.Build(zap.AddCaller(), zap.AddCallerSkip(1))
 	if err != nil {
 		panic("cannot initialize zap logger: " + err.Error())
 	}
@@ -57,6 +58,10 @@ func (l *zapLogger) Error(msg string, fields ...zap.Field) {
 
 func (l *zapLogger) Fatal(msg string, fields ...zap.Field) {
 	l.logger.Fatal(msg, fields...)
+}
+
+func (l *zapLogger) Warn(msg string, fields ...zap.Field) {
+	l.logger.Warn(msg, fields...)
 }
 
 func (l *zapLogger) Sync() error {

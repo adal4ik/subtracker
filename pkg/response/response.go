@@ -16,7 +16,7 @@ type APIError struct {
 	Resource string `json:"resource"`
 }
 
-func (e *APIError) Send(w http.ResponseWriter) {
+func (e APIError) Send(w http.ResponseWriter) {
 	j, err := json.MarshalIndent(e, "", "\t")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -28,7 +28,7 @@ func (e *APIError) Send(w http.ResponseWriter) {
 	w.Write(j)
 }
 
-func (r *APIResponse) Send(w http.ResponseWriter) {
+func (r APIResponse) Send(w http.ResponseWriter) {
 	j, err := json.MarshalIndent(r, "", "\t")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
