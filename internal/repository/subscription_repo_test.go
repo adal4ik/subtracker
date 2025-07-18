@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"net/http"
 	"regexp"
 	"subtracker/internal/domain/dao"
 	"subtracker/internal/domain/dto"
@@ -133,6 +134,46 @@ func TestGetSubscription(t *testing.T) {
 
 		assert.ErrorIs(t, err, dbErr)
 
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestUpdateSubscription(t *testing.T) {
+	ctx := context.Background()
+	t.Run("Success", func(t *testing.T) {
+		repo, mock := newTestRepo(t)
+		subToUpdate := dao.SubscriptionRow{
+			ID:          uuid.New(),
+			ServiceName: "Updated Service",
+			Price:       999,
+		}
+
+		// Обрати внимание, UserID не обновляется, поэтому его нет в SET
+		query := regexp.QuoteMeta(`UPDATE subscriptions SET service_name = $1, price = $2, start_date = $3, end_date = $4 WHERE id = $5`)
+		mock.ExpectExec(query).
+			WithArgs(subToUpdate.ServiceName, subToUpdate.Price, subToUpdate.StartDate, subToUpdate.EndDate, subToUpdate.ID).
+			WillReturnResult(sqlmock.NewResult(0, 1)) // 1 строка затронута
+
+		err := repo.UpdateSubscription(ctx, subToUpdate) // ВАЖНО: здесь нужно исправить и в репозитории!
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Not Found", func(t *testing.T) {
+		repo, mock := newTestRepo(t)
+		subToUpdate := dao.SubscriptionRow{ID: uuid.New()}
+
+		query := regexp.QuoteMeta(`UPDATE subscriptions SET service_name = $1, price = $2, start_date = $3, end_date = $4 WHERE id = $5`)
+		mock.ExpectExec(query).
+			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), subToUpdate.ID).
+			WillReturnResult(sqlmock.NewResult(0, 0)) // 0 строк затронуто
+
+		err := repo.UpdateSubscription(ctx, subToUpdate) // ВАЖНО: здесь нужно исправить и в репозитории!
+
+		assert.Error(t, err)
+		var appErr *apperrors.AppError
+		assert.True(t, errors.As(err, &appErr))
+		assert.Equal(t, http.StatusNotFound, appErr.Code)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }
