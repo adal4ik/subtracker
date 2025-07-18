@@ -9,8 +9,10 @@ import (
 	"subtracker/internal/domain/dto"
 	"subtracker/internal/mapper"
 	"subtracker/internal/repository/mocks"
+	"subtracker/pkg/apperrors"
 	"subtracker/pkg/logger"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
@@ -152,6 +154,69 @@ func TestSubscriptionService_GetSubscription(t *testing.T) {
 
 		assert.Error(t, err)
 		assert.Equal(t, repoErr, err)
+		mockRepo.AssertExpectations(t)
+	})
+}
+
+func TestSubscriptionService_UpdateSubscription(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockRepo := new(mocks.SubscriptionRepositoryInterface)
+		service := NewSubscriptionService(mockRepo, logger.NewNopLogger())
+
+		subID := uuid.New()
+		userID := uuid.New()
+		now := time.Now().Truncate(time.Second)
+
+		subFromHandler := domain.Subscription{
+			ID:          subID,
+			ServiceName: "New Service Name",
+			Price:       999,
+			StartDate:   now,
+			EndDate:     nil,
+		}
+
+		subFromDB := dao.SubscriptionRow{
+			ID:          subID,
+			UserID:      userID,
+			ServiceName: "Old Service Name",
+			Price:       500,
+			StartDate:   now.AddDate(0, -1, 0),
+			EndDate:     &now,
+		}
+
+		expectedDAOForUpdate := dao.SubscriptionRow{
+			ID:          subID,
+			UserID:      userID,
+			ServiceName: subFromHandler.ServiceName,
+			Price:       subFromHandler.Price,
+			StartDate:   subFromHandler.StartDate,
+			EndDate:     subFromHandler.EndDate,
+		}
+
+		mockRepo.On("GetSubscription", mock.Anything, subID.String()).Return(subFromDB, nil).Once()
+
+		mockRepo.On("UpdateSubscription", mock.Anything, expectedDAOForUpdate).Return(nil).Once()
+
+		err := service.UpdateSubscription(context.Background(), subFromHandler)
+
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("GetSubscription Fails (Not Found)", func(t *testing.T) {
+		mockRepo := new(mocks.SubscriptionRepositoryInterface)
+		service := NewSubscriptionService(mockRepo, logger.NewNopLogger())
+		subID := uuid.New()
+
+		repoErr := apperrors.NewNotFound("not found", nil)
+		mockRepo.On("GetSubscription", mock.Anything, subID.String()).Return(dao.SubscriptionRow{}, repoErr).Once()
+
+		err := service.UpdateSubscription(context.Background(), domain.Subscription{ID: subID})
+
+		assert.Error(t, err)
+		assert.Equal(t, repoErr, err)
+
+		mockRepo.AssertNotCalled(t, "UpdateSubscription", mock.Anything, mock.Anything)
 		mockRepo.AssertExpectations(t)
 	})
 }
