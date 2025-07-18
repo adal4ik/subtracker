@@ -3,11 +3,15 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
+	"net/http"
 	"subtracker/internal/domain/dao"
 	"subtracker/internal/domain/dto"
+	"subtracker/pkg/apperrors"
 	"subtracker/pkg/logger"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 )
 
@@ -38,16 +42,15 @@ func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, subDao 
 		zap.Time("start_date", subDao.StartDate),
 		zap.Any("end_date", subDao.EndDate),
 	)
-	query := `INSERT INTO subscriptions (id, user_id, service_name, price, start_date, end_date)
-            VALUES ($1, $2, $3, $4, $5, $6)`
+	query := `INSERT INTO subscriptions (id, user_id, service_name, price, start_date, end_date) VALUES ($1, $2, $3, $4, $5, $6)`
 	_, err := r.db.ExecContext(ctx, query, subDao.ID, subDao.UserID, subDao.ServiceName, subDao.Price, subDao.StartDate, subDao.EndDate)
 	if err != nil {
-		r.logger.Error("Failed to create subscription in database", zap.Error(err),
-			zap.String("service_name", subDao.ServiceName),
-			zap.Int("price", subDao.Price),
-			zap.String("user_id", subDao.UserID.String()),
-		)
-		return err
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+			return apperrors.New(http.StatusConflict, "subscription with this ID already exists", err)
+		}
+		r.logger.Error("Failed to create subscription in database", zap.Error(err))
+		return apperrors.NewInternalServerError("database error on create", err)
 	}
 	return nil
 }
@@ -100,7 +103,7 @@ func (r *SubscriptionRepository) ListSubscriptions(ctx context.Context, f dto.Su
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		r.logger.Error("Failed to list subscriptions", zap.Error(err))
-		return nil, err
+		return nil, apperrors.NewInternalServerError("database error on list", err)
 	}
 	defer rows.Close()
 
@@ -109,17 +112,28 @@ func (r *SubscriptionRepository) ListSubscriptions(ctx context.Context, f dto.Su
 		var sub dao.SubscriptionRow
 		if err := rows.Scan(&sub.ID, &sub.UserID, &sub.ServiceName, &sub.Price, &sub.StartDate, &sub.EndDate); err != nil {
 			r.logger.Error("Failed to scan subscription row", zap.Error(err))
-			return nil, err
+			return nil, apperrors.NewInternalServerError("database error on scan", err)
 		}
 		result = append(result, sub)
 	}
-
 	return result, nil
 }
 
 func (r *SubscriptionRepository) GetSubscription(ctx context.Context, id string) (dao.SubscriptionRow, error) {
-	// Implementation for getting a specific subscription
-	return dao.SubscriptionRow{}, nil
+	query := `SELECT id, user_id, service_name, price, start_date, end_date FROM subscriptions WHERE id = $1`
+	row := r.db.QueryRowContext(ctx, query, id)
+
+	var sub dao.SubscriptionRow
+	if err := row.Scan(&sub.ID, &sub.UserID, &sub.ServiceName, &sub.Price, &sub.StartDate, &sub.EndDate); err != nil {
+		if err == sql.ErrNoRows {
+			r.logger.Warn("Subscription not found in DB", zap.String("id", id))
+			return dao.SubscriptionRow{}, apperrors.NewNotFound("subscription not found", err)
+		}
+		r.logger.Error("Failed to get subscription from DB", zap.Error(err), zap.String("id", id))
+		return dao.SubscriptionRow{}, apperrors.NewInternalServerError("database error", err)
+	}
+
+	return sub, nil
 }
 func (r *SubscriptionRepository) UpdateSubscription(ctx context.Context, subDao dao.SubscriptionRow) error {
 	// Implementation for updating a subscription

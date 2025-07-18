@@ -43,16 +43,7 @@ func (s *SubscriptionService) CreateSubscription(ctx context.Context, subDomain 
 		subDomain.ID = uuid.New()
 	}
 	subDao := mapper.ToDAOFromDomain(subDomain)
-	if err := s.repo.CreateSubscription(ctx, subDao); err != nil {
-		s.logger.Error("Failed to create subscription", zap.Error(err),
-			zap.String("service_name", subDomain.ServiceName),
-			zap.Int("price", subDomain.Price),
-			zap.String("user_id", subDomain.UserID.String()),
-		)
-		return err
-	}
-	s.logger.Info("Subscription created successfully", zap.String("id", subDomain.ID.String()))
-	return nil
+	return s.repo.CreateSubscription(ctx, subDao)
 }
 
 func (s *SubscriptionService) ListSubscriptions(ctx context.Context, filter dto.SubscriptionFilter) ([]domain.Subscription, error) {
@@ -65,20 +56,21 @@ func (s *SubscriptionService) ListSubscriptions(ctx context.Context, filter dto.
 	)
 	subscriptions, err := s.repo.ListSubscriptions(ctx, filter)
 	if err != nil {
-		s.logger.Error("Failed to list subscriptions", zap.Error(err), zap.String("user_id", filter.UserID))
 		return nil, err
 	}
 	subDomainList := make([]domain.Subscription, len(subscriptions))
 	for i, sub := range subscriptions {
 		subDomainList[i] = mapper.ToDomainFromDAO(sub)
 	}
-	s.logger.Info("Subscriptions listed successfully", zap.Int("count", len(subDomainList)))
 	return subDomainList, nil
 }
 
 func (s *SubscriptionService) GetSubscription(ctx context.Context, id string) (domain.Subscription, error) {
-	// Implementation for getting a specific subscription
-	return domain.Subscription{}, nil
+	subDao, err := s.repo.GetSubscription(ctx, id)
+	if err != nil {
+		return domain.Subscription{}, err
+	}
+	return mapper.ToDomainFromDAO(subDao), nil
 }
 func (s *SubscriptionService) UpdateSubscription(ctx context.Context, subDomain domain.Subscription) error {
 	// Implementation for updating a subscription
