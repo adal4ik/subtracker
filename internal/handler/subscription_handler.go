@@ -8,6 +8,7 @@ import (
 	"subtracker/internal/service"
 	"subtracker/pkg/logger"
 	"subtracker/pkg/response"
+	"subtracker/utils"
 
 	"github.com/google/uuid"
 	"go.uber.org/zap"
@@ -55,7 +56,7 @@ func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.
 		s.handleError(w, r, err, "Invalid request body", http.StatusBadRequest)
 		return
 	}
-	if subscription.ServiceName == "" || subscription.Price <= 0 || subscription.UserID == "" || subscription.StartDate == "" {
+	if subscription.ServiceName == "" || subscription.Price < 0 || subscription.UserID == "" || subscription.StartDate == "" {
 		s.handleError(w, r, nil, "Missing required fields", http.StatusBadRequest)
 		return
 	}
@@ -74,8 +75,47 @@ func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.
 		s.handleError(w, r, err, "Failed to create subscription", http.StatusInternalServerError)
 		return
 	}
+	jsonResponse := response.APIResponse{
+		Code:    http.StatusCreated,
+		Message: "Subscription created successfully",
+	}
+	jsonResponse.Send(w)
 }
 
 func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
-	// Implementation for listing subscriptions
+	query := r.URL.Query()
+
+	hasEndDateStr := query.Get("has_end_date")
+
+	filter := dto.SubscriptionFilter{
+		UserID:      query.Get("user_id"),
+		ServiceName: query.Get("service_name"),
+		StartDate:   query.Get("start_date"),
+		EndDate:     query.Get("end_date"),
+		MinPrice:    utils.ParseFloatOrDefault(query.Get("min_price"), 0),
+		MaxPrice:    utils.ParseFloatOrDefault(query.Get("max_price"), 0),
+		HasEndDate:  utils.ParseBoolPointer(hasEndDateStr),
+		Limit:       utils.ParseIntOrDefault(query.Get("limit"), 10),
+		Offset:      utils.ParseIntOrDefault(query.Get("offset"), 0),
+	}
+	s.logger.Debug("Received subscription filter", zap.Any("filter", filter))
+
+	result, err := s.service.ListSubscriptions(r.Context(), filter)
+	if err != nil {
+		s.handleError(w, r, err, "Failed to list subscriptions", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+func (s *SubscriptionHandler) GetSubscription(w http.ResponseWriter, r *http.Request) {
+	// Implementation for getting a specific subscription
+}
+func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
+	// Implementation for updating a subscription
+}
+func (s *SubscriptionHandler) DeleteSubscription(w http.ResponseWriter, r *http.Request) {
+	// Implementation for deleting a subscription
 }
