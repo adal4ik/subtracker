@@ -2,9 +2,12 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"regexp"
 	"subtracker/internal/domain/dao"
 	"subtracker/internal/domain/dto"
+	"subtracker/pkg/apperrors"
 	"subtracker/pkg/logger"
 	"testing"
 	"time"
@@ -14,13 +17,11 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// newTestRepo - хелпер для создания репозитория с моком базы данных
 func newTestRepo(t *testing.T) (*SubscriptionRepository, sqlmock.Sqlmock) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("failed to open sqlmock database: %v", err)
 	}
-	// Используем логгер, который ничего не пишет в консоль во время тестов
 	repo := NewSubscriptionRepository(db, logger.NewNopLogger())
 	return repo, mock
 }
@@ -37,7 +38,6 @@ func TestCreateSubscription(t *testing.T) {
 		EndDate:     nil,
 	}
 
-	// Ожидаем точный SQL-запрос. QuoteMeta экранирует спецсимволы.
 	query := regexp.QuoteMeta(`INSERT INTO subscriptions (id, user_id, service_name, price, start_date, end_date) VALUES ($1, $2, $3, $4, $5, $6)`)
 	mock.ExpectExec(query).
 		WithArgs(subToCreate.ID, subToCreate.UserID, subToCreate.ServiceName, subToCreate.Price, subToCreate.StartDate, subToCreate.EndDate).
@@ -46,7 +46,7 @@ func TestCreateSubscription(t *testing.T) {
 	err := repo.CreateSubscription(context.Background(), subToCreate)
 
 	assert.NoError(t, err)
-	// Убеждаемся, что все ожидания от мока были выполнены
+
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
 
@@ -54,7 +54,6 @@ func TestListSubscriptions(t *testing.T) {
 	repo, mock := newTestRepo(t)
 	userID := uuid.New()
 
-	// Готовим строки, которые "вернет" база данных
 	rows := sqlmock.NewRows([]string{"id", "user_id", "service_name", "price", "start_date", "end_date"}).
 		AddRow(uuid.New(), userID, "Netflix", 1000, time.Now(), nil)
 
@@ -64,8 +63,6 @@ func TestListSubscriptions(t *testing.T) {
 		Offset: 0,
 	}
 
-	// Так как SQL-запрос строится динамически, используем гибкий regex,
-	// который проверяет только начало и конец запроса.
 	expectedQuery := `^SELECT id, user_id, service_name, price, start_date, end_date FROM subscriptions WHERE 1=1 .* ORDER BY start_date DESC LIMIT .*`
 
 	mock.ExpectQuery(expectedQuery).
@@ -77,4 +74,65 @@ func TestListSubscriptions(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, result, 1)
 	assert.NoError(t, mock.ExpectationsWereMet())
+}
+func TestGetSubscription(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		repo, mock := newTestRepo(t)
+		expectedID := uuid.New()
+		expectedRow := dao.SubscriptionRow{ID: expectedID}
+		rows := sqlmock.NewRows([]string{"id", "user_id", "service_name", "price", "start_date", "end_date"}).
+			AddRow(expectedRow.ID, uuid.New(), "Netflix", 100, time.Now(), nil)
+		query := regexp.QuoteMeta(`SELECT id, user_id, service_name, price, start_date, end_date FROM subscriptions WHERE id = $1`)
+
+		mock.ExpectQuery(query).WithArgs(expectedID.String()).WillReturnRows(rows)
+
+		result, err := repo.GetSubscription(context.Background(), expectedID.String())
+
+		assert.NoError(t, err)
+		assert.Equal(t, expectedRow.ID, result.ID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Not Found", func(t *testing.T) {
+		repo, mock := newTestRepo(t)
+		testID := uuid.New().String()
+		query := regexp.QuoteMeta(`SELECT id, user_id, service_name, price, start_date, end_date FROM subscriptions WHERE id = $1`)
+
+		mock.ExpectQuery(query).WithArgs(testID).WillReturnError(sql.ErrNoRows)
+
+		_, err := repo.GetSubscription(context.Background(), testID)
+
+		assert.Error(t, err)
+
+		var appErr *apperrors.AppError
+		assert.True(t, errors.As(err, &appErr), "error should be of type AppError")
+
+		assert.Equal(t, 404, appErr.Code)
+
+		assert.ErrorIs(t, err, sql.ErrNoRows)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Other DB Error", func(t *testing.T) {
+		repo, mock := newTestRepo(t)
+		testID := uuid.New().String()
+		dbErr := errors.New("connection failed")
+		query := regexp.QuoteMeta(`SELECT id, user_id, service_name, price, start_date, end_date FROM subscriptions WHERE id = $1`)
+
+		mock.ExpectQuery(query).WithArgs(testID).WillReturnError(dbErr)
+
+		_, err := repo.GetSubscription(context.Background(), testID)
+
+		assert.Error(t, err)
+
+		var appErr *apperrors.AppError
+		assert.True(t, errors.As(err, &appErr), "error should be of type AppError")
+
+		assert.Equal(t, 500, appErr.Code)
+
+		assert.ErrorIs(t, err, dbErr)
+
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
