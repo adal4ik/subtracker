@@ -9,6 +9,7 @@ import (
 	"subtracker/internal/domain/dto"
 	"subtracker/internal/mapper"
 	"subtracker/internal/repository/mocks"
+
 	"subtracker/pkg/apperrors"
 	"subtracker/pkg/logger"
 	"testing"
@@ -249,4 +250,43 @@ func TestSubscriptionService_DeleteSubscription(t *testing.T) {
 		assert.Equal(t, repoErr, err)
 		mockRepo.AssertExpectations(t)
 	})
+}
+
+func TestSubscriptionService_CalculateCost(t *testing.T) {
+	mockRepo := new(mocks.SubscriptionRepositoryInterface)
+	service := NewSubscriptionService(mockRepo, logger.NewNopLogger())
+
+	userID := uuid.New().String()
+	periodStart := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC) // Январь
+	periodEnd := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)   // Март (период 3 месяца)
+
+	filter := dto.CostFilter{
+		UserID:      userID,
+		PeriodStart: periodStart,
+		PeriodEnd:   periodEnd,
+	}
+
+	// Подписка, которая была активна весь период (Янв, Фев, Март -> 3 месяца)
+	sub1 := dao.SubscriptionRow{
+		Price:     100, // 100 * 3 = 300
+		StartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
+		EndDate:   nil, // Бессрочная
+	}
+
+	// Подписка, которая началась в середине периода (Фев, Март -> 2 месяца)
+	endDate2 := time.Date(2025, 3, 15, 0, 0, 0, 0, time.UTC)
+	sub2 := dao.SubscriptionRow{
+		Price:     50, // 50 * 2 = 100
+		StartDate: time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC),
+		EndDate:   &endDate2,
+	}
+
+	mockSubscriptions := []dao.SubscriptionRow{sub1, sub2}
+	mockRepo.On("ListForCostCalculation", mock.Anything, filter).Return(mockSubscriptions, nil).Once()
+
+	totalCost, err := service.CalculateCost(context.Background(), filter)
+
+	assert.NoError(t, err)
+	assert.Equal(t, 400, totalCost) // 300 + 100
+	mockRepo.AssertExpectations(t)
 }
