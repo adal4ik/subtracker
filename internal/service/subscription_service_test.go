@@ -220,3 +220,33 @@ func TestSubscriptionService_UpdateSubscription(t *testing.T) {
 		mockRepo.AssertExpectations(t)
 	})
 }
+
+func TestSubscriptionService_DeleteSubscription(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		mockRepo := new(mocks.SubscriptionRepositoryInterface)
+		service := NewSubscriptionService(mockRepo, logger.NewNopLogger())
+		testID := uuid.New().String()
+
+		mockRepo.On("DeleteSubscription", mock.Anything, testID).Return(nil).Once()
+
+		err := service.DeleteSubscription(context.Background(), testID)
+
+		assert.NoError(t, err)
+		mockRepo.AssertExpectations(t)
+	})
+
+	t.Run("Repository Returns Error", func(t *testing.T) {
+		mockRepo := new(mocks.SubscriptionRepositoryInterface)
+		service := NewSubscriptionService(mockRepo, logger.NewNopLogger())
+		testID := uuid.New().String()
+
+		repoErr := apperrors.NewNotFound("not found in repo", nil)
+		mockRepo.On("DeleteSubscription", mock.Anything, testID).Return(repoErr).Once()
+
+		err := service.DeleteSubscription(context.Background(), testID)
+
+		assert.Error(t, err)
+		assert.Equal(t, repoErr, err)
+		mockRepo.AssertExpectations(t)
+	})
+}
