@@ -82,3 +82,27 @@ func ToDAOFromDomain(sub domain.Subscription) dao.SubscriptionRow {
 		EndDate:     sub.EndDate,
 	}
 }
+
+func ToDomainFromUpdateDTO(req dto.UpdateSubscriptionRequest) (domain.Subscription, error) {
+	start, err := time.Parse("01-2006", req.StartDate)
+	if err != nil {
+		return domain.Subscription{}, err
+	}
+
+	var end *time.Time
+	if req.EndDate != "" {
+		t, err := time.Parse("01-2006", req.EndDate)
+		if err != nil {
+			return domain.Subscription{}, err
+		}
+		end = &t
+	}
+
+	return domain.Subscription{
+		// ID и UserID здесь не устанавливаются
+		ServiceName: req.ServiceName,
+		Price:       req.Price,
+		StartDate:   start,
+		EndDate:     end,
+	}, nil
+}

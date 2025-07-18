@@ -135,10 +135,30 @@ func (r *SubscriptionRepository) GetSubscription(ctx context.Context, id string)
 
 	return sub, nil
 }
+
 func (r *SubscriptionRepository) UpdateSubscription(ctx context.Context, subDao dao.SubscriptionRow) error {
-	// Implementation for updating a subscription
+	r.logger.Debug("Updating subscription in repository", zap.String("id", subDao.ID.String())) // Логирование - отлично!
+	query := `UPDATE subscriptions SET service_name = $1, price = $2, start_date = $3, end_date = $4 WHERE id = $5`
+
+	result, err := r.db.ExecContext(ctx, query, subDao.ServiceName, subDao.Price, subDao.StartDate, subDao.EndDate, subDao.ID)
+	if err != nil {
+		r.logger.Error("Failed to update subscription in database", zap.Error(err))
+		return apperrors.NewInternalServerError("database error on update", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		r.logger.Error("Failed to get rows affected after update", zap.Error(err))
+		return apperrors.NewInternalServerError("database error on update result", err)
+	}
+
+	if rowsAffected == 0 {
+		return apperrors.NewNotFound("subscription to update not found", nil)
+	}
+
 	return nil
 }
+
 func (r *SubscriptionRepository) DeleteSubscription(ctx context.Context, id string) error {
 	// Implementation for deleting a subscription
 	return nil
