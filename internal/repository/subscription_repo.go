@@ -160,6 +160,23 @@ func (r *SubscriptionRepository) UpdateSubscription(ctx context.Context, subDao 
 }
 
 func (r *SubscriptionRepository) DeleteSubscription(ctx context.Context, id string) error {
-	// Implementation for deleting a subscription
+	r.logger.Debug("Deleting subscription in repository", zap.String("id", id))
+	query := `DELETE FROM subscriptions WHERE id = $1`
+	result, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		r.logger.Error("Failed to delete subscription from database", zap.Error(err))
+		return apperrors.NewInternalServerError("database error on delete", err)
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		r.logger.Error("Failed to get rows affected after delete", zap.Error(err))
+		return apperrors.NewInternalServerError("database error on delete result", err)
+	}
+
+	if rowsAffected == 0 {
+		return apperrors.NewNotFound("subscription to delete not found", nil)
+	}
+
 	return nil
 }

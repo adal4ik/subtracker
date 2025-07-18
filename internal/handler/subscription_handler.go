@@ -143,23 +143,18 @@ func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	// Валидация для полей из Update-запроса
 	if req.ServiceName == "" || req.Price < 0 || req.StartDate == "" {
 		s.handleError(w, r, apperrors.NewBadRequest("missing required fields for update", nil))
 		return
 	}
 
-	// ИСПОЛЬЗУЕМ НОВЫЙ МАППЕР
 	sub, err := mapper.ToDomainFromUpdateDTO(req)
 	if err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("failed to parse date", err))
 		return
 	}
 
-	// Устанавливаем ID из URL. Это важно!
 	sub.ID = id
-	// UserID мы здесь не меняем, он останется прежним в базе данных.
-	// Если его тоже нужно менять, логика будет сложнее.
 
 	if err := s.service.UpdateSubscription(r.Context(), sub); err != nil {
 		s.handleError(w, r, err)
@@ -170,5 +165,16 @@ func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.
 }
 
 func (s *SubscriptionHandler) DeleteSubscription(w http.ResponseWriter, r *http.Request) {
-	// Implementation for deleting a subscription
+	id := chi.URLParam(r, "id")
+	if _, err := uuid.Parse(id); err != nil {
+		s.handleError(w, r, apperrors.NewBadRequest("invalid subscription ID format", err))
+		return
+	}
+
+	if err := s.service.DeleteSubscription(r.Context(), id); err != nil {
+		s.handleError(w, r, err)
+		return
+	}
+
+	response.APIResponse{Code: http.StatusOK, Message: "Subscription deleted successfully"}.Send(w)
 }
