@@ -148,13 +148,12 @@ func TestUpdateSubscription(t *testing.T) {
 			Price:       999,
 		}
 
-		// Обрати внимание, UserID не обновляется, поэтому его нет в SET
 		query := regexp.QuoteMeta(`UPDATE subscriptions SET service_name = $1, price = $2, start_date = $3, end_date = $4 WHERE id = $5`)
 		mock.ExpectExec(query).
 			WithArgs(subToUpdate.ServiceName, subToUpdate.Price, subToUpdate.StartDate, subToUpdate.EndDate, subToUpdate.ID).
-			WillReturnResult(sqlmock.NewResult(0, 1)) // 1 строка затронута
+			WillReturnResult(sqlmock.NewResult(0, 1))
 
-		err := repo.UpdateSubscription(ctx, subToUpdate) // ВАЖНО: здесь нужно исправить и в репозитории!
+		err := repo.UpdateSubscription(ctx, subToUpdate)
 		assert.NoError(t, err)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
@@ -166,14 +165,63 @@ func TestUpdateSubscription(t *testing.T) {
 		query := regexp.QuoteMeta(`UPDATE subscriptions SET service_name = $1, price = $2, start_date = $3, end_date = $4 WHERE id = $5`)
 		mock.ExpectExec(query).
 			WithArgs(sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg(), subToUpdate.ID).
-			WillReturnResult(sqlmock.NewResult(0, 0)) // 0 строк затронуто
+			WillReturnResult(sqlmock.NewResult(0, 0))
 
-		err := repo.UpdateSubscription(ctx, subToUpdate) // ВАЖНО: здесь нужно исправить и в репозитории!
+		err := repo.UpdateSubscription(ctx, subToUpdate)
 
 		assert.Error(t, err)
 		var appErr *apperrors.AppError
 		assert.True(t, errors.As(err, &appErr))
 		assert.Equal(t, http.StatusNotFound, appErr.Code)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+func TestDeleteSubscription(t *testing.T) {
+	t.Run("Success", func(t *testing.T) {
+		repo, mock := newTestRepo(t)
+		testID := uuid.New().String()
+
+		query := regexp.QuoteMeta(`DELETE FROM subscriptions WHERE id = $1`)
+		mock.ExpectExec(query).WithArgs(testID).WillReturnResult(sqlmock.NewResult(0, 1))
+
+		err := repo.DeleteSubscription(context.Background(), testID)
+
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("Not Found", func(t *testing.T) {
+		repo, mock := newTestRepo(t)
+		testID := uuid.New().String()
+
+		query := regexp.QuoteMeta(`DELETE FROM subscriptions WHERE id = $1`)
+		mock.ExpectExec(query).WithArgs(testID).WillReturnResult(sqlmock.NewResult(0, 0))
+
+		err := repo.DeleteSubscription(context.Background(), testID)
+
+		assert.Error(t, err)
+		var appErr *apperrors.AppError
+		assert.True(t, errors.As(err, &appErr))
+		assert.Equal(t, http.StatusNotFound, appErr.Code)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DB Error", func(t *testing.T) {
+		repo, mock := newTestRepo(t)
+		testID := uuid.New().String()
+		dbErr := errors.New("connection broken")
+
+		query := regexp.QuoteMeta(`DELETE FROM subscriptions WHERE id = $1`)
+		mock.ExpectExec(query).WithArgs(testID).WillReturnError(dbErr)
+
+		err := repo.DeleteSubscription(context.Background(), testID)
+
+		assert.Error(t, err)
+		var appErr *apperrors.AppError
+		assert.True(t, errors.As(err, &appErr))
+		assert.Equal(t, http.StatusInternalServerError, appErr.Code)
+		assert.ErrorIs(t, err, dbErr)
 		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 }
