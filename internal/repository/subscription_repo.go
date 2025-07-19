@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
 
 	"subtracker/internal/domain/dao"
@@ -12,6 +11,7 @@ import (
 	"subtracker/pkg/apperrors"
 	"subtracker/pkg/logger"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/jackc/pgx/v5/pgconn"
 	"go.uber.org/zap"
 )
@@ -48,7 +48,7 @@ func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, subDao 
 	_, err := r.db.ExecContext(ctx, query, subDao.ID, subDao.UserID, subDao.ServiceName, subDao.Price, subDao.StartDate, subDao.EndDate)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" { // unique_violation
+		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
 			return apperrors.New(http.StatusConflict, "subscription with this ID already exists", err)
 		}
 		r.logger.Error("Failed to create subscription in database", zap.Error(err))
@@ -58,52 +58,49 @@ func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, subDao 
 }
 
 func (r *SubscriptionRepository) ListSubscriptions(ctx context.Context, f dto.SubscriptionFilter) ([]dao.SubscriptionRow, error) {
-	query := `SELECT id, user_id, service_name, price, start_date, end_date FROM subscriptions WHERE 1=1`
-	args := []interface{}{}
-	argIdx := 1
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	queryBuilder := psql.Select("id", "user_id", "service_name", "price", "start_date", "end_date").
+		From("subscriptions")
 
 	if f.UserID != "" {
-		query += fmt.Sprintf(" AND user_id = $%d", argIdx)
-		args = append(args, f.UserID)
-		argIdx++
+		queryBuilder = queryBuilder.Where(sq.Eq{"user_id": f.UserID})
 	}
 	if f.ServiceName != "" {
-		query += fmt.Sprintf(" AND service_name = $%d", argIdx)
-		args = append(args, f.ServiceName)
-		argIdx++
+		queryBuilder = queryBuilder.Where(sq.Eq{"service_name": f.ServiceName})
 	}
 	if f.MinPrice > 0 {
-		query += fmt.Sprintf(" AND price >= $%d", argIdx)
-		args = append(args, f.MinPrice)
-		argIdx++
+		queryBuilder = queryBuilder.Where(sq.GtOrEq{"price": f.MinPrice})
 	}
 	if f.MaxPrice > 0 {
-		query += fmt.Sprintf(" AND price <= $%d", argIdx)
-		args = append(args, f.MaxPrice)
-		argIdx++
+		queryBuilder = queryBuilder.Where(sq.LtOrEq{"price": f.MaxPrice})
 	}
 	if f.StartDate != "" {
-		query += fmt.Sprintf(" AND start_date >= $%d", argIdx)
-		args = append(args, f.StartDate)
-		argIdx++
+
+		queryBuilder = queryBuilder.Where(sq.GtOrEq{"start_date": f.StartDate})
 	}
 	if f.EndDate != "" {
-		query += fmt.Sprintf(" AND end_date <= $%d", argIdx)
-		args = append(args, f.EndDate)
-		argIdx++
+		queryBuilder = queryBuilder.Where(sq.LtOrEq{"end_date": f.EndDate})
 	}
 	if f.HasEndDate != nil {
 		if *f.HasEndDate {
-			query += " AND end_date IS NOT NULL"
+			queryBuilder = queryBuilder.Where(sq.NotEq{"end_date": nil})
 		} else {
-			query += " AND end_date IS NULL"
+			queryBuilder = queryBuilder.Where(sq.Eq{"end_date": nil})
 		}
 	}
+	queryBuilder = queryBuilder.OrderBy("start_date DESC").
+		Limit(uint64(f.Limit)).
+		Offset(uint64(f.Offset))
 
-	query += fmt.Sprintf(" ORDER BY start_date DESC LIMIT $%d OFFSET $%d", argIdx, argIdx+1)
-	args = append(args, f.Limit, f.Offset)
+	sql, args, err := queryBuilder.ToSql()
+	if err != nil {
+		r.logger.Error("Failed to build SQL query for ListSubscriptions", zap.Error(err))
+		return nil, apperrors.NewInternalServerError("failed to build list query", err)
+	}
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	r.logger.Debug("Executing ListSubscriptions", zap.String("sql", sql), zap.Any("args", args))
+
+	rows, err := r.db.QueryContext(ctx, sql, args...)
 	if err != nil {
 		r.logger.Error("Failed to list subscriptions", zap.Error(err))
 		return nil, apperrors.NewInternalServerError("database error on list", err)
@@ -185,28 +182,34 @@ func (r *SubscriptionRepository) DeleteSubscription(ctx context.Context, id stri
 }
 
 func (r *SubscriptionRepository) ListForCostCalculation(ctx context.Context, filter dto.CostFilter) ([]dao.SubscriptionRow, error) {
-	query := `SELECT id, user_id, service_name, price, start_date, end_date 
-			FROM subscriptions 
-			WHERE user_id = $1`
-	args := []interface{}{filter.UserID}
-	argIdx := 2
+	psql := sq.StatementBuilder.PlaceholderFormat(sq.Dollar)
+	queryBuilder := psql.Select("id", "user_id", "service_name", "price", "start_date", "end_date").
+		From("subscriptions")
 
+	queryBuilder = queryBuilder.Where(sq.Eq{"user_id": filter.UserID})
 	if filter.ServiceName != "" {
-		query += fmt.Sprintf(" AND service_name = $%d", argIdx)
-		args = append(args, filter.ServiceName)
-		argIdx++
+		queryBuilder = queryBuilder.Where(sq.Eq{"service_name": filter.ServiceName})
+	}
+	queryBuilder = queryBuilder.Where(sq.LtOrEq{"start_date": filter.PeriodEnd}).
+		Where(sq.Or{
+			sq.Eq{"end_date": nil},
+			sq.GtOrEq{"end_date": filter.PeriodStart},
+		})
+
+	sql, args, err := queryBuilder.ToSql()
+	if err != nil {
+		r.logger.Error("Failed to build SQL for ListForCostCalculation", zap.Error(err))
+		return nil, apperrors.NewInternalServerError("failed to build cost query", err)
 	}
 
-	query += fmt.Sprintf(` AND (start_date <= $%d AND (end_date IS NULL OR end_date >= $%d))`, argIdx, argIdx+1)
-	args = append(args, filter.PeriodEnd, filter.PeriodStart)
+	r.logger.Debug("Executing ListForCostCalculation", zap.String("sql", sql), zap.Any("args", args))
 
-	rows, err := r.db.QueryContext(ctx, query, args...)
+	rows, err := r.db.QueryContext(ctx, sql, args...)
 	if err != nil {
 		r.logger.Error("Failed to list subscriptions for cost calculation", zap.Error(err))
 		return nil, apperrors.NewInternalServerError("database error on cost calculation", err)
 	}
 	defer rows.Close()
-
 	var result []dao.SubscriptionRow
 	for rows.Next() {
 		var sub dao.SubscriptionRow
