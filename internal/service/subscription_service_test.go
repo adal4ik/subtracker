@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"testing"
+	"time"
+
 	"subtracker/internal/domain"
 	"subtracker/internal/domain/dao"
 	"subtracker/internal/domain/dto"
@@ -12,8 +15,6 @@ import (
 
 	"subtracker/pkg/apperrors"
 	"subtracker/pkg/logger"
-	"testing"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"

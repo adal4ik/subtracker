@@ -4,9 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
+
 	"subtracker/internal/config"
 	"subtracker/pkg/logger"
-	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"go.uber.org/zap"

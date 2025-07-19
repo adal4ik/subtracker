@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"subtracker/internal/domain"
 	"subtracker/internal/domain/dao"
 	"subtracker/internal/domain/dto"
@@ -94,6 +95,7 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, subToUpdat
 
 	return s.repo.UpdateSubscription(ctx, finalSubDAO)
 }
+
 func (s *SubscriptionService) DeleteSubscription(ctx context.Context, id string) error {
 	s.logger.Debug("Deleting subscription", zap.String("id", id))
 	return s.repo.DeleteSubscription(ctx, id)

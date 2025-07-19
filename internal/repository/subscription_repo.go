@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+
 	"subtracker/internal/domain/dao"
 	"subtracker/internal/domain/dto"
 	"subtracker/pkg/apperrors"
@@ -55,6 +56,7 @@ func (r *SubscriptionRepository) CreateSubscription(ctx context.Context, subDao 
 	}
 	return nil
 }
+
 func (r *SubscriptionRepository) ListSubscriptions(ctx context.Context, f dto.SubscriptionFilter) ([]dao.SubscriptionRow, error) {
 	query := `SELECT id, user_id, service_name, price, start_date, end_date FROM subscriptions WHERE 1=1`
 	args := []interface{}{}

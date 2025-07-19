@@ -6,12 +6,13 @@ import (
 	"errors"
 	"net/http"
 	"regexp"
+	"testing"
+	"time"
+
 	"subtracker/internal/domain/dao"
 	"subtracker/internal/domain/dto"
 	"subtracker/pkg/apperrors"
 	"subtracker/pkg/logger"
-	"testing"
-	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/google/uuid"
@@ -76,6 +77,7 @@ func TestListSubscriptions(t *testing.T) {
 	assert.Len(t, result, 1)
 	assert.NoError(t, mock.ExpectationsWereMet())
 }
+
 func TestGetSubscription(t *testing.T) {
 	t.Run("Success", func(t *testing.T) {
 		repo, mock := newTestRepo(t)

@@ -7,13 +7,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"time"
+
 	"subtracker/internal/config"
 	"subtracker/internal/handler"
 	"subtracker/internal/repository"
 	"subtracker/internal/service"
 	"subtracker/pkg/loadenv"
 	"subtracker/pkg/logger"
-	"time"
 
 	"go.uber.org/zap"
 )
@@ -85,5 +86,4 @@ func main() {
 	}
 
 	logger.Info("Server stopped gracefully")
-
 }

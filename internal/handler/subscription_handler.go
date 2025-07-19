@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
+
 	"subtracker/internal/domain/dto"
 	"subtracker/internal/mapper"
 	"subtracker/internal/service"
@@ -12,7 +14,6 @@ import (
 	"subtracker/pkg/logger"
 	"subtracker/pkg/response"
 	"subtracker/utils"
-	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

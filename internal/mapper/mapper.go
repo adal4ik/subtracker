@@ -1,11 +1,11 @@
 package mapper
 
 import (
+	"time"
+
 	"subtracker/internal/domain"
 	"subtracker/internal/domain/dao"
 	"subtracker/internal/domain/dto"
-
-	"time"
 
 	"github.com/google/uuid"
 )

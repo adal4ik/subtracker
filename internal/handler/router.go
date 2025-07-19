@@ -11,7 +11,6 @@ func Router(handlers Handlers) http.Handler {
 	r := chi.NewRouter()
 
 	corsMiddleware := cors.New(cors.Options{
-
 		AllowedOrigins:   []string{"*"},
 		AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},

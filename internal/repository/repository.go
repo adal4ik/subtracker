@@ -2,6 +2,7 @@ package repository
 
 import (
 	"database/sql"
+
 	"subtracker/pkg/logger"
 )
 
