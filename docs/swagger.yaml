@@ -1,0 +1,312 @@
+basePath: /
+definitions:
+  apperrors.AppError:
+    properties:
+      code:
+        type: integer
+      err: {}
+      message:
+        type: string
+    type: object
+  dto.CostResponse:
+    properties:
+      total_cost:
+        type: integer
+    type: object
+  dto.CreateSubscriptionRequest:
+    properties:
+      end_date:
+        description: может быть пустым
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        description: '"MM-YYYY"'
+        type: string
+      user_id:
+        description: UUID в string
+        type: string
+    type: object
+  dto.SubscriptionResponse:
+    properties:
+      end_date:
+        type: string
+      id:
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        type: string
+      user_id:
+        type: string
+    type: object
+  dto.UpdateSubscriptionRequest:
+    properties:
+      end_date:
+        type: string
+      price:
+        type: integer
+      service_name:
+        type: string
+      start_date:
+        type: string
+    type: object
+  response.APIResponse:
+    properties:
+      code:
+        type: integer
+      message:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    name: adal4ik
+    url: https://github.com/adal4ik/subtracker
+  description: This is a service for aggregating user online subscriptions.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  title: Subscription Tracker API
+  version: "1.0"
+paths:
+  /subscriptions:
+    get:
+      description: Gets a list of subscriptions with filtering and pagination.
+      parameters:
+      - description: Filter by User ID (UUID)
+        in: query
+        name: user_id
+        type: string
+      - description: Filter by Service Name
+        in: query
+        name: service_name
+        type: string
+      - description: Filter by minimum price
+        in: query
+        name: min_price
+        type: integer
+      - description: Filter by maximum price
+        in: query
+        name: max_price
+        type: integer
+      - description: 'Filter by start date (format: MM-YYYY)'
+        in: query
+        name: start_date
+        type: string
+      - description: 'Filter by end date (format: MM-YYYY)'
+        in: query
+        name: end_date
+        type: string
+      - description: Filter by presence of an end date
+        in: query
+        name: has_end_date
+        type: boolean
+      - description: Pagination limit (default 10, max 100)
+        in: query
+        name: limit
+        type: integer
+      - description: Pagination offset (default 0)
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/dto.SubscriptionResponse'
+            type: array
+        "400":
+          description: Invalid filter parameters
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+      summary: List Subscriptions
+      tags:
+      - Subscriptions
+    post:
+      consumes:
+      - application/json
+      description: Adds a new subscription to the system based on the provided data.
+      parameters:
+      - description: Subscription Information
+        in: body
+        name: subscription
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CreateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "400":
+          description: Invalid request body or fields
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "409":
+          description: Conflict if subscription with this ID already exists
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+      summary: Create Subscription
+      tags:
+      - Subscriptions
+  /subscriptions/{id}:
+    delete:
+      description: Deletes a subscription by its unique ID.
+      parameters:
+      - description: Subscription ID (UUID format)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Invalid ID format
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "404":
+          description: Subscription not found
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+      summary: Delete Subscription
+      tags:
+      - Subscriptions
+    get:
+      description: Retrieves a single subscription by its unique ID.
+      parameters:
+      - description: Subscription ID (UUID format)
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.SubscriptionResponse'
+        "400":
+          description: Invalid ID format
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "404":
+          description: Subscription not found
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+      summary: Get Subscription by ID
+      tags:
+      - Subscriptions
+    put:
+      consumes:
+      - application/json
+      description: Updates an existing subscription's details by its ID. UserID cannot
+        be changed.
+      parameters:
+      - description: Subscription ID (UUID format)
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Fields to update
+        in: body
+        name: subscription
+        required: true
+        schema:
+          $ref: '#/definitions/dto.UpdateSubscriptionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.APIResponse'
+        "400":
+          description: Invalid ID format or request body
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "404":
+          description: Subscription not found
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+      summary: Update Subscription
+      tags:
+      - Subscriptions
+  /subscriptions/cost:
+    get:
+      description: Calculates the total cost of subscriptions for a user over a specified
+        period.
+      parameters:
+      - description: User ID (UUID format) for whom to calculate the cost
+        in: query
+        name: user_id
+        required: true
+        type: string
+      - description: 'Start of the calculation period (format: MM-YYYY)'
+        in: query
+        name: period_start
+        required: true
+        type: string
+      - description: 'End of the calculation period (format: MM-YYYY)'
+        in: query
+        name: period_end
+        required: true
+        type: string
+      - description: 'Optional: filter by a specific service name'
+        in: query
+        name: service_name
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/dto.CostResponse'
+        "400":
+          description: Invalid or missing parameters
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/apperrors.AppError'
+      summary: Calculate Total Cost
+      tags:
+      - Subscriptions
+schemes:
+- http
+swagger: "2.0"
