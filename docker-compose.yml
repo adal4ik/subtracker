@@ -5,13 +5,13 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+    container_name: subtracker-app
     ports:
       - "${APP_PORT}:${APP_PORT}"
     environment:
+      - POSTGRES_DSN=postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=disable
       - APP_PORT=${APP_PORT}
       - LOG_LEVEL=${LOG_LEVEL}
-      - POSTGRES_DSN=${POSTGRES_DSN}
-    
     depends_on:
       db:
         condition: service_healthy
@@ -19,12 +19,13 @@ services:
 
   db:
     image: postgres:15-alpine
+    container_name: subtracker-db
     environment:
       POSTGRES_DB: ${DB_NAME}
       POSTGRES_USER: ${DB_USER}
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "${DB_PORT}:5432" 
+      - "${DB_PORT}:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
