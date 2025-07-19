@@ -3,27 +3,27 @@ package dto
 import "time"
 
 type CreateSubscriptionRequest struct {
-	ServiceName string `json:"service_name" validate:"required,max=100"`
-	Price       int    `json:"price"        validate:"required,gte=0"`
-	UserID      string `json:"user_id"      validate:"required,uuid4"`
-	StartDate   string `json:"start_date"   validate:"required,datetime=01-2006"`
-	EndDate     string `json:"end_date,omitempty" validate:"omitempty,datetime=01-2006"`
+	ServiceName string `json:"service_name" validate:"required,max=100" example:"Yandex Plus"`
+	Price       int    `json:"price"        validate:"required,gte=0"   example:"299"`
+	UserID      string `json:"user_id"      validate:"required,uuid4"   example:"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"`
+	StartDate   string `json:"start_date"   validate:"required,datetime=01-2006" example:"07-2025"`
+	EndDate     string `json:"end_date,omitempty" validate:"omitempty,datetime=01-2006" example:"08-2026"`
 }
 
 type UpdateSubscriptionRequest struct {
-	ServiceName string `json:"service_name" validate:"required,max=100"`
-	Price       int    `json:"price"        validate:"required,gte=0"`
-	StartDate   string `json:"start_date"   validate:"required,datetime=01-2006"`
-	EndDate     string `json:"end_date,omitempty" validate:"omitempty,datetime=01-2006"`
+	ServiceName string `json:"service_name" validate:"required,max=100" example:"Yandex Plus Family"`
+	Price       int    `json:"price"        validate:"required,gte=0"   example:"499"`
+	StartDate   string `json:"start_date"   validate:"required,datetime=01-2006" example:"07-2025"`
+	EndDate     string `json:"end_date,omitempty" validate:"omitempty,datetime=01-2006" example:"08-2027"`
 }
 
 type SubscriptionResponse struct {
-	ID          string `json:"id"`
-	ServiceName string `json:"service_name"`
-	Price       int    `json:"price"`
-	UserID      string `json:"user_id"`
-	StartDate   string `json:"start_date"`
-	EndDate     string `json:"end_date,omitempty"`
+	ID          string `json:"id" example:"d290f1ee-6c54-4b01-90e6-d701748f0851"`
+	ServiceName string `json:"service_name" example:"Yandex Plus"`
+	Price       int    `json:"price" example:"299"`
+	UserID      string `json:"user_id" example:"a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"`
+	StartDate   string `json:"start_date" example:"07-2025"`
+	EndDate     string `json:"end_date,omitempty" example:"08-2026"`
 }
 
 type SubscriptionFilter struct {
@@ -53,5 +53,5 @@ type CostFilter struct {
 }
 
 type CostResponse struct {
-	TotalCost int `json:"total_cost"`
+	TotalCost int `json:"total_cost" example:"2434"`
 }
