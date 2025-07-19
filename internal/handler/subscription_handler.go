@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"strconv"
 	"time"
 
 	"subtracker/internal/domain/dto"
@@ -13,6 +12,7 @@ import (
 	"subtracker/pkg/apperrors"
 	"subtracker/pkg/logger"
 	"subtracker/pkg/response"
+	"subtracker/pkg/validator"
 	"subtracker/utils"
 
 	"github.com/go-chi/chi/v5"
@@ -57,72 +57,6 @@ func (s *SubscriptionHandler) handleError(w http.ResponseWriter, r *http.Request
 	jsonErr.Send(w)
 }
 
-func (s *SubscriptionHandler) validateListFilter(r *http.Request) error {
-	query := r.URL.Query()
-
-	if userIDStr := query.Get("user_id"); userIDStr != "" {
-		if _, err := uuid.Parse(userIDStr); err != nil {
-			return apperrors.NewBadRequest("invalid user_id format", err)
-		}
-	}
-
-	if startDateStr := query.Get("start_date"); startDateStr != "" {
-		if _, err := time.Parse("01-2006", startDateStr); err != nil {
-			return apperrors.NewBadRequest("invalid start_date format, use MM-YYYY", err)
-		}
-	}
-
-	if endDateStr := query.Get("end_date"); endDateStr != "" {
-		if _, err := time.Parse("01-2006", endDateStr); err != nil {
-			return apperrors.NewBadRequest("invalid end_date format, use MM-YYYY", err)
-		}
-	}
-
-	if limitStr := query.Get("limit"); limitStr != "" {
-		limit, err := strconv.Atoi(limitStr)
-		if err != nil || limit < 0 {
-			return apperrors.NewBadRequest("limit must be a non-negative integer", err)
-		}
-		const maxLimit = 100
-		if limit > maxLimit {
-			return apperrors.NewBadRequest("limit exceeds maximum allowed value of 100", nil)
-		}
-	}
-
-	if offsetStr := query.Get("offset"); offsetStr != "" {
-		if offset, err := strconv.Atoi(offsetStr); err != nil || offset < 0 {
-			return apperrors.NewBadRequest("offset must be a non-negative integer", err)
-		}
-	}
-
-	var minPrice, maxPrice int
-	var err error
-
-	minPriceStr := query.Get("min_price")
-	if minPriceStr != "" {
-		minPrice, err = strconv.Atoi(minPriceStr)
-		if err != nil || minPrice < 0 {
-			return apperrors.NewBadRequest("min_price must be a non-negative integer", err)
-		}
-	}
-
-	maxPriceStr := query.Get("max_price")
-	if maxPriceStr != "" {
-		maxPrice, err = strconv.Atoi(maxPriceStr)
-		if err != nil || maxPrice < 0 {
-			return apperrors.NewBadRequest("max_price must be a non-negative integer", err)
-		}
-	}
-
-	if minPriceStr != "" && maxPriceStr != "" {
-		if minPrice > maxPrice {
-			return apperrors.NewBadRequest("min_price cannot be greater than max_price", nil)
-		}
-	}
-
-	return nil
-}
-
 // @Summary      Create Subscription
 // @Description  Adds a new subscription to the system based on the provided data.
 // @Tags         Subscriptions
@@ -140,12 +74,8 @@ func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.
 		s.handleError(w, r, apperrors.NewBadRequest("invalid request body", err))
 		return
 	}
-	if req.ServiceName == "" || req.Price < 0 || req.UserID == "" || req.StartDate == "" {
-		s.handleError(w, r, apperrors.NewBadRequest("missing required fields", nil))
-		return
-	}
-	if _, err := uuid.Parse(req.UserID); err != nil {
-		s.handleError(w, r, apperrors.NewBadRequest("invalid user ID format", err))
+	if err := validator.ValidateStruct(req); err != nil {
+		s.handleError(w, r, apperrors.NewBadRequest("validation failed", err))
 		return
 	}
 
@@ -181,11 +111,6 @@ func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.
 // @Failure      500  {object}  apperrors.AppError "Internal server error"
 // @Router       /subscriptions [get]
 func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
-	if err := s.validateListFilter(r); err != nil {
-		s.handleError(w, r, err)
-		return
-	}
-
 	query := r.URL.Query()
 	filter := dto.SubscriptionFilter{
 		UserID:      query.Get("user_id"),
@@ -197,6 +122,10 @@ func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 		HasEndDate:  utils.ParseBoolPointer(query.Get("has_end_date")),
 		Limit:       utils.ParseIntOrDefault(query.Get("limit"), 10),
 		Offset:      utils.ParseIntOrDefault(query.Get("offset"), 0),
+	}
+	if err := validator.ValidateStruct(filter); err != nil {
+		s.handleError(w, r, apperrors.NewBadRequest("invalid filter parameters", err))
+		return
 	}
 
 	result, err := s.service.ListSubscriptions(r.Context(), filter)
@@ -267,8 +196,8 @@ func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	if req.ServiceName == "" || req.Price < 0 || req.StartDate == "" {
-		s.handleError(w, r, apperrors.NewBadRequest("missing required fields for update", nil))
+	if err := validator.ValidateStruct(req); err != nil {
+		s.handleError(w, r, apperrors.NewBadRequest("validation failed", err))
 		return
 	}
 
@@ -328,33 +257,30 @@ func (s *SubscriptionHandler) DeleteSubscription(w http.ResponseWriter, r *http.
 func (s *SubscriptionHandler) CalculateCost(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
-	userID := query.Get("user_id")
-	if _, err := uuid.Parse(userID); err != nil {
-		s.handleError(w, r, apperrors.NewBadRequest("invalid or missing user_id", err))
-		return
-	}
-
-	periodStartStr := query.Get("period_start")
-	periodStart, err := time.Parse("01-2006", periodStartStr)
-	if err != nil {
-		s.handleError(w, r, apperrors.NewBadRequest("invalid or missing period_start, use MM-YYYY format", err))
-		return
-	}
-
-	periodEndStr := query.Get("period_end")
-	periodEnd, err := time.Parse("01-2006", periodEndStr)
-	if err != nil {
-		s.handleError(w, r, apperrors.NewBadRequest("invalid or missing period_end, use MM-YYYY format", err))
-		return
-	}
-
-	filter := dto.CostFilter{
-		UserID:      userID,
+	costRequest := dto.CostRequest{
+		UserID:      query.Get("user_id"),
 		ServiceName: query.Get("service_name"),
+		PeriodStart: query.Get("period_start"),
+		PeriodEnd:   query.Get("period_end"),
+	}
+
+	if err := validator.ValidateStruct(costRequest); err != nil {
+		s.handleError(w, r, apperrors.NewBadRequest("invalid query parameters", err))
+		return
+	}
+	periodStart, _ := time.Parse("01-2006", costRequest.PeriodStart)
+	periodEnd, _ := time.Parse("01-2006", costRequest.PeriodEnd)
+
+	if periodEnd.Before(periodStart) {
+		s.handleError(w, r, apperrors.NewBadRequest("period_end cannot be before period_start", nil))
+		return
+	}
+	filter := dto.CostFilter{
+		UserID:      costRequest.UserID,
+		ServiceName: costRequest.ServiceName,
 		PeriodStart: periodStart,
 		PeriodEnd:   periodEnd,
 	}
-
 	totalCost, err := s.service.CalculateCost(r.Context(), filter)
 	if err != nil {
 		s.handleError(w, r, err)
