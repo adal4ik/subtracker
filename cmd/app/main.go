@@ -7,21 +7,20 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"time"
-
 	"subtracker/internal/config"
 	"subtracker/internal/handler"
 	"subtracker/internal/repository"
 	"subtracker/internal/service"
 	"subtracker/pkg/loadenv"
 	"subtracker/pkg/logger"
+	"time"
 
 	"go.uber.org/zap"
 )
 
 // @title           Subscription Tracker API
 // @version         1.0
-// @description     This is a service for aggregating user online subscriptions, part of a test task for Effective Mobile.
+// @description     This is a service for aggregating user online subscriptions.
 
 // @contact.name   adal4ik
 // @contact.url    https://github.com/adal4ik/subtracker
@@ -38,7 +37,7 @@ func main() {
 	logger := logger.New(os.Getenv("APP_ENV"))
 	defer func() {
 		if err := logger.Sync(); err != nil {
-			fmt.Printf("Error syncing logger: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error syncing logger: %v\n", err)
 		}
 	}()
 	logger.Info("Starting Subtracker application", zap.String("environment", os.Getenv("APP_ENV")))
@@ -48,8 +47,7 @@ func main() {
 	// Connect to the database
 	db, err := repository.ConnectDB(ctx, cfg.Postgres, logger)
 	if err != nil {
-		logger.Error("Failed to connect to the database", zap.Error(err))
-		os.Exit(1)
+		logger.Fatal("Failed to connect to the database", zap.Error(err))
 	}
 	defer db.Close()
 	logger.Info("Connected to the database successfully", zap.String("dsn", cfg.Postgres.PostgresDSN))
@@ -86,4 +84,5 @@ func main() {
 	}
 
 	logger.Info("Server stopped gracefully")
+
 }
