@@ -11,49 +11,75 @@ definitions:
   dto.CostResponse:
     properties:
       total_cost:
+        example: 2434
         type: integer
     type: object
   dto.CreateSubscriptionRequest:
     properties:
       end_date:
-        description: может быть пустым
+        example: 08-2026
         type: string
       price:
+        example: 299
+        minimum: 0
         type: integer
       service_name:
+        example: Yandex Plus
+        maxLength: 100
         type: string
       start_date:
-        description: '"MM-YYYY"'
+        example: 07-2025
         type: string
       user_id:
-        description: UUID в string
+        example: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
         type: string
+    required:
+    - price
+    - service_name
+    - start_date
+    - user_id
     type: object
   dto.SubscriptionResponse:
     properties:
       end_date:
+        example: 08-2026
         type: string
       id:
+        example: d290f1ee-6c54-4b01-90e6-d701748f0851
         type: string
       price:
+        example: 299
         type: integer
       service_name:
+        example: Yandex Plus
         type: string
       start_date:
+        example: 07-2025
         type: string
       user_id:
+        example: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11
         type: string
     type: object
   dto.UpdateSubscriptionRequest:
     properties:
       end_date:
+        example: 08-2027
         type: string
       price:
+        example: 499
+        minimum: 0
         type: integer
       service_name:
+        example: Yandex Plus Family
+        maxLength: 100
         type: string
       start_date:
+        example: 07-2025
         type: string
+    required:
+    - price
+    - service_name
+    - start_date
     type: object
   response.APIResponse:
     properties:

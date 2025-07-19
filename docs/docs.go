@@ -388,30 +388,41 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "total_cost": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 2434
                 }
             }
         },
         "dto.CreateSubscriptionRequest": {
             "type": "object",
+            "required": [
+                "price",
+                "service_name",
+                "start_date",
+                "user_id"
+            ],
             "properties": {
                 "end_date": {
-                    "description": "может быть пустым",
-                    "type": "string"
+                    "type": "string",
+                    "example": "08-2026"
                 },
                 "price": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 299
                 },
                 "service_name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100,
+                    "example": "Yandex Plus"
                 },
                 "start_date": {
-                    "description": "\"MM-YYYY\"",
-                    "type": "string"
+                    "type": "string",
+                    "example": "07-2025"
                 },
                 "user_id": {
-                    "description": "UUID в string",
-                    "type": "string"
+                    "type": "string",
+                    "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
                 }
             }
         },
@@ -419,39 +430,56 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "end_date": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "08-2026"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "d290f1ee-6c54-4b01-90e6-d701748f0851"
                 },
                 "price": {
-                    "type": "integer"
+                    "type": "integer",
+                    "example": 299
                 },
                 "service_name": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "Yandex Plus"
                 },
                 "start_date": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "07-2025"
                 },
                 "user_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
                 }
             }
         },
         "dto.UpdateSubscriptionRequest": {
             "type": "object",
+            "required": [
+                "price",
+                "service_name",
+                "start_date"
+            ],
             "properties": {
                 "end_date": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "08-2027"
                 },
                 "price": {
-                    "type": "integer"
+                    "type": "integer",
+                    "minimum": 0,
+                    "example": 499
                 },
                 "service_name": {
-                    "type": "string"
+                    "type": "string",
+                    "maxLength": 100,
+                    "example": "Yandex Plus Family"
                 },
                 "start_date": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "07-2025"
                 }
             }
         },
@@ -476,7 +504,7 @@ var SwaggerInfo = &swag.Spec{
 	BasePath:         "/",
 	Schemes:          []string{"http"},
 	Title:            "Subscription Tracker API",
-	Description:      "This is a service for aggregating user online subscriptions, part of a test task for Effective Mobile.",
+	Description:      "This is a service for aggregating user online subscriptions.",
 	InfoInstanceName: "swagger",
 	SwaggerTemplate:  docTemplate,
 	LeftDelim:        "{{",
