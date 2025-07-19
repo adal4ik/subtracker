@@ -18,6 +18,19 @@ import (
 	"go.uber.org/zap"
 )
 
+// @title           Subscription Tracker API
+// @version         1.0
+// @description     This is a service for aggregating user online subscriptions, part of a test task for Effective Mobile.
+
+// @contact.name   adal4ik
+// @contact.url    https://github.com/adal4ik/subtracker
+
+// @license.name  MIT
+// @license.url   https://opensource.org/licenses/MIT
+
+// @host      localhost:8080
+// @BasePath  /
+// @schemes   http
 func main() {
 	ctx := context.Background()
 	loadenv.LoadEnvFile(".env")

@@ -122,6 +122,17 @@ func (s *SubscriptionHandler) validateListFilter(r *http.Request) error {
 	return nil
 }
 
+// @Summary      Create Subscription
+// @Description  Adds a new subscription to the system based on the provided data.
+// @Tags         Subscriptions
+// @Accept       json
+// @Produce      json
+// @Param        subscription body dto.CreateSubscriptionRequest true "Subscription Information"
+// @Success      201  {object}  response.APIResponse
+// @Failure      400  {object}  apperrors.AppError "Invalid request body or fields"
+// @Failure      409  {object}  apperrors.AppError "Conflict if subscription with this ID already exists"
+// @Failure      500  {object}  apperrors.AppError "Internal server error"
+// @Router       /subscriptions [post]
 func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
 	var req dto.CreateSubscriptionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -151,6 +162,23 @@ func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.
 	response.APIResponse{Code: http.StatusCreated, Message: "Subscription created successfully"}.Send(w)
 }
 
+// @Summary      List Subscriptions
+// @Description  Gets a list of subscriptions with filtering and pagination.
+// @Tags         Subscriptions
+// @Produce      json
+// @Param        user_id      query     string  false  "Filter by User ID (UUID)"
+// @Param        service_name query     string  false  "Filter by Service Name"
+// @Param        min_price    query     int     false  "Filter by minimum price"
+// @Param        max_price    query     int     false  "Filter by maximum price"
+// @Param        start_date   query     string  false  "Filter by start date (format: MM-YYYY)"
+// @Param        end_date     query     string  false  "Filter by end date (format: MM-YYYY)"
+// @Param        has_end_date query     bool    false  "Filter by presence of an end date"
+// @Param        limit        query     int     false  "Pagination limit (default 10, max 100)"
+// @Param        offset       query     int     false  "Pagination offset (default 0)"
+// @Success      200  {array}   dto.SubscriptionResponse
+// @Failure      400  {object}  apperrors.AppError "Invalid filter parameters"
+// @Failure      500  {object}  apperrors.AppError "Internal server error"
+// @Router       /subscriptions [get]
 func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
 	if err := s.validateListFilter(r); err != nil {
 		s.handleError(w, r, err)
@@ -185,6 +213,16 @@ func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 	json.NewEncoder(w).Encode(responseDTOs)
 }
 
+// @Summary      Get Subscription by ID
+// @Description  Retrieves a single subscription by its unique ID.
+// @Tags         Subscriptions
+// @Produce      json
+// @Param        id   path      string  true  "Subscription ID (UUID format)"
+// @Success      200  {object}  dto.SubscriptionResponse
+// @Failure      400  {object}  apperrors.AppError "Invalid ID format"
+// @Failure      404  {object}  apperrors.AppError "Subscription not found"
+// @Failure      500  {object}  apperrors.AppError "Internal server error"
+// @Router       /subscriptions/{id} [get]
 func (s *SubscriptionHandler) GetSubscription(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if _, err := uuid.Parse(id); err != nil {
@@ -202,6 +240,18 @@ func (s *SubscriptionHandler) GetSubscription(w http.ResponseWriter, r *http.Req
 	json.NewEncoder(w).Encode(mapper.ToDTOFromDomain(subscription))
 }
 
+// @Summary      Update Subscription
+// @Description  Updates an existing subscription's details by its ID. UserID cannot be changed.
+// @Tags         Subscriptions
+// @Accept       json
+// @Produce      json
+// @Param        id           path      string                       true  "Subscription ID (UUID format)"
+// @Param        subscription body      dto.UpdateSubscriptionRequest true  "Fields to update"
+// @Success      200          {object}  response.APIResponse
+// @Failure      400          {object}  apperrors.AppError "Invalid ID format or request body"
+// @Failure      404          {object}  apperrors.AppError "Subscription not found"
+// @Failure      500          {object}  apperrors.AppError "Internal server error"
+// @Router       /subscriptions/{id} [put]
 func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
 	id, err := uuid.Parse(idStr)
@@ -237,6 +287,16 @@ func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.
 	response.APIResponse{Code: http.StatusOK, Message: "Subscription updated successfully"}.Send(w)
 }
 
+// @Summary      Delete Subscription
+// @Description  Deletes a subscription by its unique ID.
+// @Tags         Subscriptions
+// @Produce      json
+// @Param        id   path      string  true  "Subscription ID (UUID format)"
+// @Success      204  "No Content"
+// @Failure      400  {object}  apperrors.AppError "Invalid ID format"
+// @Failure      404  {object}  apperrors.AppError "Subscription not found"
+// @Failure      500  {object}  apperrors.AppError "Internal server error"
+// @Router       /subscriptions/{id} [delete]
 func (s *SubscriptionHandler) DeleteSubscription(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	if _, err := uuid.Parse(id); err != nil {
@@ -249,13 +309,24 @@ func (s *SubscriptionHandler) DeleteSubscription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	response.APIResponse{Code: http.StatusOK, Message: "Subscription deleted successfully"}.Send(w)
+	response.APIResponse{Code: http.StatusNoContent, Message: "Subscription deleted successfully"}.Send(w)
 }
 
+// @Summary      Calculate Total Cost
+// @Description  Calculates the total cost of subscriptions for a user over a specified period.
+// @Tags         Subscriptions
+// @Produce      json
+// @Param        user_id      query     string  true   "User ID (UUID format) for whom to calculate the cost"
+// @Param        period_start query     string  true   "Start of the calculation period (format: MM-YYYY)"
+// @Param        period_end   query     string  true   "End of the calculation period (format: MM-YYYY)"
+// @Param        service_name query     string  false  "Optional: filter by a specific service name"
+// @Success      200          {object}  dto.CostResponse
+// @Failure      400          {object}  apperrors.AppError "Invalid or missing parameters"
+// @Failure      500          {object}  apperrors.AppError "Internal server error"
+// @Router       /subscriptions/cost [get]
 func (s *SubscriptionHandler) CalculateCost(w http.ResponseWriter, r *http.Request) {
 	query := r.URL.Query()
 
-	// 1. Парсим и валидируем обязательные параметры
 	userID := query.Get("user_id")
 	if _, err := uuid.Parse(userID); err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("invalid or missing user_id", err))
@@ -276,24 +347,25 @@ func (s *SubscriptionHandler) CalculateCost(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	// 2. Создаем фильтр
 	filter := dto.CostFilter{
 		UserID:      userID,
-		ServiceName: query.Get("service_name"), // Опциональный параметр
+		ServiceName: query.Get("service_name"),
 		PeriodStart: periodStart,
 		PeriodEnd:   periodEnd,
 	}
 
-	// 3. Вызываем сервис
 	totalCost, err := s.service.CalculateCost(r.Context(), filter)
 	if err != nil {
 		s.handleError(w, r, err)
 		return
 	}
 
-	// 4. Формируем успешный ответ
 	responseDTO := dto.CostResponse{TotalCost: totalCost}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(responseDTO)
+}
+
+func (s *SubscriptionHandler) ServeSwaggerJSON(w http.ResponseWriter, r *http.Request) {
+	http.ServeFile(w, r, "./docs/swagger.json")
 }

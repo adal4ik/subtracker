@@ -99,7 +99,6 @@ func ToDomainFromUpdateDTO(req dto.UpdateSubscriptionRequest) (domain.Subscripti
 	}
 
 	return domain.Subscription{
-		// ID и UserID здесь не устанавливаются
 		ServiceName: req.ServiceName,
 		Price:       req.Price,
 		StartDate:   start,

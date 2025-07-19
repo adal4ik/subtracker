@@ -102,7 +102,6 @@ func (s *SubscriptionService) DeleteSubscription(ctx context.Context, id string)
 func (s *SubscriptionService) CalculateCost(ctx context.Context, filter dto.CostFilter) (int, error) {
 	s.logger.Debug("Calculating cost", zap.Any("filter", filter))
 
-	// 1. Получаем все подписки, которые потенциально могли быть активны в этот период
 	subscriptions, err := s.repo.ListForCostCalculation(ctx, filter)
 	if err != nil {
 		return 0, err
@@ -110,20 +109,15 @@ func (s *SubscriptionService) CalculateCost(ctx context.Context, filter dto.Cost
 
 	totalCost := 0
 
-	// Устанавливаем конец периода на конец месяца для корректного сравнения
 	periodEndEffective := filter.PeriodEnd.AddDate(0, 1, -1)
 
-	// 2. Проходим по каждой подписке и считаем ее вклад в общую стоимость
 	for _, sub := range subscriptions {
-		// Определяем фактический интервал активности подписки
 		subStart := sub.StartDate
-		// Если дата окончания не задана, считаем, что она активна до конца запрашиваемого периода
 		subEnd := periodEndEffective
 		if sub.EndDate != nil && sub.EndDate.Before(periodEndEffective) {
 			subEnd = *sub.EndDate
 		}
 
-		// Находим пересечение периода подписки и запрошенного периода
 		overlapStart := filter.PeriodStart
 		if subStart.After(overlapStart) {
 			overlapStart = subStart
@@ -134,9 +128,7 @@ func (s *SubscriptionService) CalculateCost(ctx context.Context, filter dto.Cost
 			overlapEnd = periodEndEffective
 		}
 
-		// Если интервал валидный (начало не позже конца)
 		if !overlapStart.After(overlapEnd) {
-			// Считаем количество полных месяцев в пересечении
 			months := (overlapEnd.Year()-overlapStart.Year())*12 + int(overlapEnd.Month()) - int(overlapStart.Month()) + 1
 			totalCost += sub.Price * months
 		}

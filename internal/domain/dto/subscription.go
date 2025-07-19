@@ -5,9 +5,9 @@ import "time"
 type CreateSubscriptionRequest struct {
 	ServiceName string `json:"service_name"`
 	Price       int    `json:"price"`
-	UserID      string `json:"user_id"`            // UUID в string
-	StartDate   string `json:"start_date"`         // "MM-YYYY"
-	EndDate     string `json:"end_date,omitempty"` // может быть пустым
+	UserID      string `json:"user_id"`    // UUID в string
+	StartDate   string `json:"start_date"` // "MM-YYYY"
+	EndDate     string `json:"end_date,omitempty"`
 }
 
 type UpdateSubscriptionRequest struct {
@@ -39,10 +39,10 @@ type SubscriptionFilter struct {
 }
 
 type CostFilter struct {
-	UserID      string
-	ServiceName string
-	PeriodStart time.Time
-	PeriodEnd   time.Time
+	UserID      string    `json:"user_id"`
+	ServiceName string    `json:"service_name"`
+	PeriodStart time.Time `json:"period_start"` // "MM-YYYY"
+	PeriodEnd   time.Time `json:"period_end"`   // "MM-YYYY"
 }
 
 type CostResponse struct {

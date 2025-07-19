@@ -183,14 +183,12 @@ func (r *SubscriptionRepository) DeleteSubscription(ctx context.Context, id stri
 }
 
 func (r *SubscriptionRepository) ListForCostCalculation(ctx context.Context, filter dto.CostFilter) ([]dao.SubscriptionRow, error) {
-	// Базовый запрос
 	query := `SELECT id, user_id, service_name, price, start_date, end_date 
 			FROM subscriptions 
 			WHERE user_id = $1`
 	args := []interface{}{filter.UserID}
 	argIdx := 2
 
-	// Добавляем фильтр по имени сервиса, если он есть
 	if filter.ServiceName != "" {
 		query += fmt.Sprintf(" AND service_name = $%d", argIdx)
 		args = append(args, filter.ServiceName)

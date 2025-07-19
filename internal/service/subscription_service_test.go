@@ -257,8 +257,8 @@ func TestSubscriptionService_CalculateCost(t *testing.T) {
 	service := NewSubscriptionService(mockRepo, logger.NewNopLogger())
 
 	userID := uuid.New().String()
-	periodStart := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC) // Январь
-	periodEnd := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)   // Март (период 3 месяца)
+	periodStart := time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)
 
 	filter := dto.CostFilter{
 		UserID:      userID,
@@ -266,17 +266,15 @@ func TestSubscriptionService_CalculateCost(t *testing.T) {
 		PeriodEnd:   periodEnd,
 	}
 
-	// Подписка, которая была активна весь период (Янв, Фев, Март -> 3 месяца)
 	sub1 := dao.SubscriptionRow{
-		Price:     100, // 100 * 3 = 300
+		Price:     100,
 		StartDate: time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC),
-		EndDate:   nil, // Бессрочная
+		EndDate:   nil,
 	}
 
-	// Подписка, которая началась в середине периода (Фев, Март -> 2 месяца)
 	endDate2 := time.Date(2025, 3, 15, 0, 0, 0, 0, time.UTC)
 	sub2 := dao.SubscriptionRow{
-		Price:     50, // 50 * 2 = 100
+		Price:     50,
 		StartDate: time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC),
 		EndDate:   &endDate2,
 	}
@@ -287,6 +285,6 @@ func TestSubscriptionService_CalculateCost(t *testing.T) {
 	totalCost, err := service.CalculateCost(context.Background(), filter)
 
 	assert.NoError(t, err)
-	assert.Equal(t, 400, totalCost) // 300 + 100
+	assert.Equal(t, 400, totalCost)
 	mockRepo.AssertExpectations(t)
 }

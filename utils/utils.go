@@ -5,19 +5,12 @@ import (
 )
 
 // ParseIntOrDefault parses string to int, fallback to default on error
-func ParseIntOrDefault(s string, defaultVal int) int {
-	if val, err := strconv.Atoi(s); err == nil {
-		return val
+func ParseIntOrDefault(s string, defaultValue int) int {
+	val, err := strconv.Atoi(s)
+	if err != nil {
+		return defaultValue
 	}
-	return defaultVal
-}
-
-// ParseFloatOrDefault parses string to float64, fallback to default on error
-func ParseFloatOrDefault(s string, defaultVal float64) float64 {
-	if val, err := strconv.ParseFloat(s, 64); err == nil {
-		return val
-	}
-	return defaultVal
+	return val
 }
 
 // ParseBoolPointer parses "1" or "0" into *bool, returns nil if invalid or empty
