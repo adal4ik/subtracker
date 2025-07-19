@@ -31,15 +31,25 @@ func NewSubscriptionHandler(service service.SubscriptionServiceInterface, logger
 		logger:  logger,
 	}
 }
-
 func (s *SubscriptionHandler) handleError(w http.ResponseWriter, r *http.Request, err error) {
-	s.logger.Error("API Error",
-		zap.Error(err),
-		zap.String("url", r.URL.Path),
-	)
-
 	var appErr *apperrors.AppError
-	if errors.As(err, &appErr) {
+	isAppError := errors.As(err, &appErr)
+
+	if isAppError && appErr.Code >= 400 && appErr.Code < 500 {
+		s.logger.Warn("Client Error",
+			zap.Int("status_code", appErr.Code),
+			zap.String("message", appErr.Message),
+			zap.Error(err),
+			zap.String("url", r.URL.Path),
+		)
+	} else {
+		s.logger.Error("Server Error",
+			zap.Error(err),
+			zap.String("url", r.URL.Path),
+		)
+	}
+
+	if isAppError {
 		jsonErr := response.APIError{
 			Code:     appErr.Code,
 			Message:  appErr.Message,
@@ -69,11 +79,16 @@ func (s *SubscriptionHandler) handleError(w http.ResponseWriter, r *http.Request
 // @Failure      500  {object}  apperrors.AppError "Internal server error"
 // @Router       /subscriptions [post]
 func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.Request) {
+	s.logger.Info("CreateSubscription request received",
+		zap.String("method", r.Method),
+		zap.String("url", r.URL.String()),
+	)
 	var req dto.CreateSubscriptionRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("invalid request body", err))
 		return
 	}
+	s.logger.Debug("Request body decoded and parsed", zap.Any("request_dto", req))
 	if err := validator.ValidateStruct(req); err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("validation failed", err))
 		return
@@ -89,6 +104,10 @@ func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.
 		s.handleError(w, r, err)
 		return
 	}
+	s.logger.Info("Subscription created successfully",
+		zap.String("user_id", req.UserID),
+		zap.String("service_name", req.ServiceName),
+	)
 
 	response.APIResponse{Code: http.StatusCreated, Message: "Subscription created successfully"}.Send(w)
 }
@@ -111,6 +130,9 @@ func (s *SubscriptionHandler) CreateSubscription(w http.ResponseWriter, r *http.
 // @Failure      500  {object}  apperrors.AppError "Internal server error"
 // @Router       /subscriptions [get]
 func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.Request) {
+	s.logger.Info("ListSubscriptions request received",
+		zap.String("url", r.URL.String()),
+	)
 	query := r.URL.Query()
 	filter := dto.SubscriptionFilter{
 		UserID:      query.Get("user_id"),
@@ -123,6 +145,8 @@ func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 		Limit:       utils.ParseIntOrDefault(query.Get("limit"), 10),
 		Offset:      utils.ParseIntOrDefault(query.Get("offset"), 0),
 	}
+	s.logger.Debug("Parsed subscription filter", zap.Any("filter", filter))
+
 	if err := validator.ValidateStruct(filter); err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("invalid filter parameters", err))
 		return
@@ -138,7 +162,9 @@ func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 	for i, sub := range result {
 		responseDTOs[i] = mapper.ToDTOFromDomain(sub)
 	}
-
+	s.logger.Info("ListSubscriptions completed successfully",
+		zap.Int("subscriptions_found", len(result)),
+	)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(responseDTOs)
 }
@@ -155,6 +181,8 @@ func (s *SubscriptionHandler) ListSubscriptions(w http.ResponseWriter, r *http.R
 // @Router       /subscriptions/{id} [get]
 func (s *SubscriptionHandler) GetSubscription(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+	s.logger.Info("GetSubscription request received", zap.String("subscription_id", id))
+
 	if _, err := uuid.Parse(id); err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("invalid subscription ID format", err))
 		return
@@ -165,6 +193,7 @@ func (s *SubscriptionHandler) GetSubscription(w http.ResponseWriter, r *http.Req
 		s.handleError(w, r, err)
 		return
 	}
+	s.logger.Info("Subscription found and returned successfully", zap.String("subscription_id", id))
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(mapper.ToDTOFromDomain(subscription))
@@ -184,6 +213,9 @@ func (s *SubscriptionHandler) GetSubscription(w http.ResponseWriter, r *http.Req
 // @Router       /subscriptions/{id} [put]
 func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.Request) {
 	idStr := chi.URLParam(r, "id")
+
+	s.logger.Info("UpdateSubscription request received", zap.String("subscription_id", idStr))
+
 	id, err := uuid.Parse(idStr)
 	if err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("invalid subscription ID format", err))
@@ -195,6 +227,8 @@ func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.
 		s.handleError(w, r, apperrors.NewBadRequest("invalid request body", err))
 		return
 	}
+
+	s.logger.Debug("Decoded update request body", zap.Any("request_dto", req))
 
 	if err := validator.ValidateStruct(req); err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("validation failed", err))
@@ -214,6 +248,8 @@ func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.
 		return
 	}
 
+	s.logger.Info("Subscription updated successfully", zap.String("subscription_id", idStr))
+
 	response.APIResponse{Code: http.StatusOK, Message: "Subscription updated successfully"}.Send(w)
 }
 
@@ -229,6 +265,9 @@ func (s *SubscriptionHandler) UpdateSubscription(w http.ResponseWriter, r *http.
 // @Router       /subscriptions/{id} [delete]
 func (s *SubscriptionHandler) DeleteSubscription(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
+
+	s.logger.Info("DeleteSubscription request received", zap.String("subscription_id", id))
+
 	if _, err := uuid.Parse(id); err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("invalid subscription ID format", err))
 		return
@@ -239,7 +278,9 @@ func (s *SubscriptionHandler) DeleteSubscription(w http.ResponseWriter, r *http.
 		return
 	}
 
-	response.APIResponse{Code: http.StatusNoContent, Message: "Subscription deleted successfully"}.Send(w)
+	s.logger.Info("Subscription deleted successfully", zap.String("subscription_id", id))
+
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // @Summary      Calculate Total Cost
@@ -255,8 +296,9 @@ func (s *SubscriptionHandler) DeleteSubscription(w http.ResponseWriter, r *http.
 // @Failure      500          {object}  apperrors.AppError "Internal server error"
 // @Router       /subscriptions/cost [get]
 func (s *SubscriptionHandler) CalculateCost(w http.ResponseWriter, r *http.Request) {
-	query := r.URL.Query()
+	s.logger.Info("CalculateCost request received", zap.String("query", r.URL.RawQuery))
 
+	query := r.URL.Query()
 	costRequest := dto.CostRequest{
 		UserID:      query.Get("user_id"),
 		ServiceName: query.Get("service_name"),
@@ -264,10 +306,13 @@ func (s *SubscriptionHandler) CalculateCost(w http.ResponseWriter, r *http.Reque
 		PeriodEnd:   query.Get("period_end"),
 	}
 
+	s.logger.Debug("Parsed cost request", zap.Any("request_dto", costRequest))
+
 	if err := validator.ValidateStruct(costRequest); err != nil {
 		s.handleError(w, r, apperrors.NewBadRequest("invalid query parameters", err))
 		return
 	}
+
 	periodStart, _ := time.Parse("01-2006", costRequest.PeriodStart)
 	periodEnd, _ := time.Parse("01-2006", costRequest.PeriodEnd)
 
@@ -275,17 +320,21 @@ func (s *SubscriptionHandler) CalculateCost(w http.ResponseWriter, r *http.Reque
 		s.handleError(w, r, apperrors.NewBadRequest("period_end cannot be before period_start", nil))
 		return
 	}
+
 	filter := dto.CostFilter{
 		UserID:      costRequest.UserID,
 		ServiceName: costRequest.ServiceName,
 		PeriodStart: periodStart,
 		PeriodEnd:   periodEnd,
 	}
+
 	totalCost, err := s.service.CalculateCost(r.Context(), filter)
 	if err != nil {
 		s.handleError(w, r, err)
 		return
 	}
+
+	s.logger.Info("Cost calculation completed successfully", zap.Int("total_cost", totalCost))
 
 	responseDTO := dto.CostResponse{TotalCost: totalCost}
 	w.Header().Set("Content-Type", "application/json")

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"time"
 
 	"subtracker/internal/domain"
 	"subtracker/internal/domain/dao"
@@ -36,14 +37,13 @@ func NewSubscriptionService(repo repository.SubscriptionRepositoryInterface, log
 }
 
 func (s *SubscriptionService) CreateSubscription(ctx context.Context, subDomain domain.Subscription) error {
-	s.logger.Debug("Creating subscription", zap.String("service_name", subDomain.ServiceName),
-		zap.Int("price", subDomain.Price),
+	s.logger.Debug("Entering CreateSubscription service",
+		zap.String("service_name", subDomain.ServiceName),
 		zap.String("user_id", subDomain.UserID.String()),
-		zap.Time("start_date", subDomain.StartDate),
-		zap.Any("end_date", subDomain.EndDate),
 	)
 	if subDomain.ID == uuid.Nil {
 		subDomain.ID = uuid.New()
+		s.logger.Debug("Generated new subscription ID", zap.String("subscription_id", subDomain.ID.String()))
 	}
 	subDao := mapper.ToDAOFromDomain(subDomain)
 	return s.repo.CreateSubscription(ctx, subDao)
@@ -65,10 +65,13 @@ func (s *SubscriptionService) ListSubscriptions(ctx context.Context, filter dto.
 	for i, sub := range subscriptions {
 		subDomainList[i] = mapper.ToDomainFromDAO(sub)
 	}
+	s.logger.Debug("Exiting ListSubscriptions service", zap.Int("count", len(subDomainList)))
+
 	return subDomainList, nil
 }
 
 func (s *SubscriptionService) GetSubscription(ctx context.Context, id string) (domain.Subscription, error) {
+	s.logger.Debug("Entering GetSubscription service", zap.String("id", id))
 	subDao, err := s.repo.GetSubscription(ctx, id)
 	if err != nil {
 		return domain.Subscription{}, err
@@ -77,12 +80,17 @@ func (s *SubscriptionService) GetSubscription(ctx context.Context, id string) (d
 }
 
 func (s *SubscriptionService) UpdateSubscription(ctx context.Context, subToUpdate domain.Subscription) error {
-	s.logger.Debug("Attempting to update subscription", zap.String("id", subToUpdate.ID.String()))
+	s.logger.Debug("Entering UpdateSubscription service",
+		zap.String("subscription_id", subToUpdate.ID.String()),
+		zap.Any("updates", subToUpdate),
+	)
 
 	existingSubDAO, err := s.repo.GetSubscription(ctx, subToUpdate.ID.String())
 	if err != nil {
 		return err
 	}
+
+	s.logger.Debug("Found existing subscription to update", zap.Any("existing_dao", existingSubDAO))
 
 	finalSubDAO := dao.SubscriptionRow{
 		ID:          existingSubDAO.ID,
@@ -93,27 +101,44 @@ func (s *SubscriptionService) UpdateSubscription(ctx context.Context, subToUpdat
 		EndDate:     subToUpdate.EndDate,
 	}
 
+	s.logger.Debug("Proceeding to update with final DAO object", zap.Any("final_dao", finalSubDAO))
+
 	return s.repo.UpdateSubscription(ctx, finalSubDAO)
 }
 
 func (s *SubscriptionService) DeleteSubscription(ctx context.Context, id string) error {
-	s.logger.Debug("Deleting subscription", zap.String("id", id))
-	return s.repo.DeleteSubscription(ctx, id)
+	s.logger.Debug("Entering DeleteSubscription service", zap.String("id", id))
+
+	err := s.repo.DeleteSubscription(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	s.logger.Debug("Exiting DeleteSubscription service", zap.String("id", id))
+	return nil
 }
 
 func (s *SubscriptionService) CalculateCost(ctx context.Context, filter dto.CostFilter) (int, error) {
-	s.logger.Debug("Calculating cost", zap.Any("filter", filter))
+	s.logger.Debug("Entering CalculateCost service", zap.Any("filter", filter))
 
 	subscriptions, err := s.repo.ListForCostCalculation(ctx, filter)
 	if err != nil {
 		return 0, err
 	}
 
-	totalCost := 0
+	s.logger.Debug("Found subscriptions for calculation", zap.Int("count", len(subscriptions)))
 
-	periodEndEffective := filter.PeriodEnd.AddDate(0, 1, -1)
+	totalCost := 0
+	periodEndEffective := filter.PeriodEnd.AddDate(0, 1, 0).Add(-1 * time.Nanosecond)
 
 	for _, sub := range subscriptions {
+		s.logger.Debug("Processing subscription for cost calculation",
+			zap.String("subscription_id", sub.ID.String()),
+			zap.Time("sub_start_date", sub.StartDate),
+			zap.Any("sub_end_date", sub.EndDate),
+			zap.Int("sub_price", sub.Price),
+		)
+
 		subStart := sub.StartDate
 		subEnd := periodEndEffective
 		if sub.EndDate != nil && sub.EndDate.Before(periodEndEffective) {
@@ -126,16 +151,25 @@ func (s *SubscriptionService) CalculateCost(ctx context.Context, filter dto.Cost
 		}
 
 		overlapEnd := subEnd
-		if periodEndEffective.Before(overlapEnd) {
-			overlapEnd = periodEndEffective
+
+		if overlapStart.After(overlapEnd) {
+			s.logger.Debug("Subscription is outside the calculation period, skipping.", zap.String("subscription_id", sub.ID.String()))
+			continue
 		}
 
-		if !overlapStart.After(overlapEnd) {
-			months := (overlapEnd.Year()-overlapStart.Year())*12 + int(overlapEnd.Month()) - int(overlapStart.Month()) + 1
-			totalCost += sub.Price * months
-		}
+		months := (overlapEnd.Year()-overlapStart.Year())*12 + int(overlapEnd.Month()) - int(overlapStart.Month()) + 1
+		costForSub := sub.Price * months
+		totalCost += costForSub
+
+		s.logger.Debug("Calculated cost for one subscription",
+			zap.String("subscription_id", sub.ID.String()),
+			zap.Time("overlap_start", overlapStart),
+			zap.Time("overlap_end", overlapEnd),
+			zap.Int("months_counted", months),
+			zap.Int("cost_for_this_sub", costForSub),
+		)
 	}
 
-	s.logger.Info("Cost calculated successfully", zap.Int("total_cost", totalCost))
+	s.logger.Info("Total cost calculated successfully", zap.Int("total_cost", totalCost))
 	return totalCost, nil
 }
