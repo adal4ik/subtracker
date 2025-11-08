@@ -97,5 +97,24 @@ make help
 ```
 
 ---
+
+## ✨ Features
+
+✅ **Implemented**
+- CRUD operations for subscriptions  
+- Filtering, pagination, and status tracking  
+- PostgreSQL + Clean Architecture  
+- Admin routes for service management  
+
+🚧 **In Progress**
+- Renewal scheduler (auto-renewal of subscriptions)  
+- CSV import/export support  
+
+🔮 **Planned**
+- JWT authentication for users  
+- Email notifications for renewals  
+- Usage tracking and statistics dashboard
+---
+
 **Author:**  
 adal4ik
